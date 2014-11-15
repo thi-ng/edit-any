@@ -90,17 +90,24 @@
   :post! (fn [ctx]
            (dosync
             (let [{:keys [body title attribs]} (get-in ctx [:request :params])
+                  add-props (cond-> [[id "dcterms:modified" (format-timestamp (System/currentTimeMillis))]]
+                                    body (conj [id "dcterms:content" body])
+                                    title (conj [id "rdfs:label" title]))
+                  remove-props (cond-> #{"dcterms:modified"}
+                                       body  (conj "dcterms:content")
+                                       title (conj "rdfs:label"))
                   triples (->> (map (fn [[p o]] [id (name p) o]) attribs)
-                               (concat [[id "dcterms:content" body]
-                                        [id "rdfs:label" title]
-                                        [id "dcterms:modified" (format-timestamp (System/currentTimeMillis))]]))]
+                               (concat add-props)
+                               (trio/triple-seq))]
               (alter graph
                      (fn [g]
                        (let [old (q/query
                                   {:construct '[[?s ?p ?o]]
                                    :from g
                                    :query [{:where [['?s '?p '?o]]}]
-                                   :values {'?s #{id} '?p #{"dcterms:content" "dcterms:modified"}}})]
+                                   :values {'?s #{id} '?p remove-props}})]
+                         (prn :old old)
+                         (prn :new triples)
                          (-> g
                              (trio/remove-triples old)
                              (trio/add-triples triples)))))
