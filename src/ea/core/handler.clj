@@ -58,7 +58,9 @@
                                   :order-asc '[?other ?pred]})]
                  (str
                   "<h1>" (or ?title id) "</h1>"
-                  "<textarea>" ?body "</textarea>"
+                  "<form method=\"post\" action=\"/resources/" id "\">"
+                  "<p><textarea name=\"body\">" ?body "</textarea></p>"
+                  "<p><input type=\"submit\"/></p>"
                   (when (seq attribs)
                     (str "<h2>Attribs</h2>"
                          "<table>"
@@ -83,7 +85,8 @@
                                           "<td>" (resource-link ?pred ?ptitle) "</td>"
                                           "<td>" (or ?title id) "</td></tr>")))
                               (apply str))
-                         "</table>")))))
+                         "</table>"))
+                  "</form>")))
   :post! (fn [ctx]
            (dosync
             (let [{:keys [body title attribs]} (get-in ctx [:request :params])
@@ -91,13 +94,23 @@
                                (concat [[id "dcterms:content" body]
                                         [id "rdfs:label" title]
                                         [id "dcterms:modified" (format-timestamp (System/currentTimeMillis))]]))]
-              (prn :triples triples)
-              (alter graph trio/add-triples triples)
-              (spit "graph.edn" (sort (trio/select @graph))))))
-  :post-redirect? (fn [ctx] {:location (str "/resources/" id)}))
+              (alter graph
+                     (fn [g]
+                       (let [old (q/query
+                                  {:construct '[[?s ?p ?o]]
+                                   :from g
+                                   :query [{:where [['?s '?p '?o]]}]
+                                   :values {'?s #{id} '?p #{"dcterms:content" "dcterms:modified"}}})]
+                         (-> g
+                             (trio/remove-triples old)
+                             (trio/add-triples triples)))))
+              (spit "graph.edn" (sort (trio/select @graph)))))
+           {::id id})
+  :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
 
 (defroutes app-routes
   (ANY "/resources/:id" [id] (page id)))
 
 (def app
-  (wrap-defaults app-routes (assoc-in site-defaults [:security :anti-forgery] false)))
+  (->> (assoc-in site-defaults [:security :anti-forgery] false)
+       (wrap-defaults app-routes)))
