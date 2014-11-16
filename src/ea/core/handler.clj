@@ -9,9 +9,11 @@
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
    [clojure.edn :as edn]
+   [clojure.data.json :as json]
    [clojure.string :as str]
    [clj-time.core :as t]
-   [clj-time.format :as tf]))
+   [clj-time.format :as tf]
+   [taoensso.timbre :refer [info warn error]]))
 
 (def graph
   (ref
@@ -73,16 +75,27 @@
     (spit "graph.edn" (sort (trio/select @graph)))
     {::id id}))
 
+(defn describe-resource
+  [id]
+  (q/query
+   {:describe '?s
+    :from @graph
+    :query [{:where '[[?s ?p ?o]]}]
+    :values {'?s #{id}}}))
+
 (defmulti handle-resource-get #(-> % :representation :media-type))
 
 (defmethod handle-resource-get "application/edn"
   [ctx]
   (let [id (maybe-number (-> ctx :request :params :id))]
-    (vec (q/query
-          {:describe '?s
-           :from @graph
-           :query [{:where '[[?s ?p ?o]]}]
-           :values {'?s #{id}}}))))
+    {:body (vec (describe-resource id))}))
+
+(defmethod handle-resource-get "application/json"
+  [ctx]
+  (let [id (maybe-number (-> ctx :request :params :id))]
+    (json/write-str
+     {:body (vec (describe-resource id))}
+     :escape-slash false)))
 
 (defmethod handle-resource-get "text/html"
   [ctx]
@@ -127,16 +140,16 @@
         (when (or (seq shared-pred) (seq shared-obj))
           (view/related-resource-table (or ?title id) shared-pred shared-obj))]]])))
 
-(defresource page [id]
-  :available-media-types ["text/html" "application/edn"]
-  :allowed-methods [:get :post :patch]
+(defresource resource [id]
+  :available-media-types ["text/html" "application/edn" "application/json"]
+  :allowed-methods [:get :post]
   :handle-ok handle-resource-get
   :post! handle-resource-update
   :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
 
 (defroutes app-routes
   (GET "/" [] (resp/redirect "/resources/index"))
-  (ANY "/resources/:id" [id] (page id)))
+  (ANY "/resources/:id" [id] (resource id)))
 
 (def app
   (->> (assoc-in site-defaults [:security :anti-forgery] false)
