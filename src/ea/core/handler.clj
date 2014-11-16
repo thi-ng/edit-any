@@ -9,7 +9,10 @@
    [clojure.edn :as edn]
    [hiccup.page :refer [html5 include-js include-css]]
    [hiccup.element :as el]
-   [markdown.core :as md]))
+   [hiccup.form :as form]
+   [markdown.core :as md]
+   [clj-time.core :as t]
+   [clj-time.format :as tf]))
 
 (def graph
   (->> "graph.edn"
@@ -18,18 +21,23 @@
        (apply trio/plain-store)
        ref))
 
-(def date-format (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss"))
-
 (defn format-date
-  [d] (.format date-format d))
+  [dt] (tf/unparse (tf/formatters :mysql) dt))
 
-(defn format-timestamp
-  [t] (.format date-format (java.util.Date. t)))
+(defn date-triples
+  [id dt]
+  (let [[y m d] (->> [t/year t/month t/day t/hour t/minute t/second]
+                     (map #(% dt))
+                     (reductions #(str % "-" %2)))]
+       [[id "time:year" y]
+        [id "time:year-month" m]
+        [id "time:year-month-day" d]]))
 
 (defn resource-link
   [id & [label]]
-  (let [id (if (keyword? id) (name id) id)]
-    (str "<a href=\"/resources/" id "\">" (or label id) "</a>")))
+  (let [id (if (keyword? id) (name id) (str id))
+        uri (if (re-find #"^https?://" id) id (str "/resources/" id))]
+    [:a {:href uri} (or label id)]))
 
 (defn maybe-number
   [x] (try (Long/parseLong x) (catch Exception e x)))
@@ -67,7 +75,6 @@
                                           {:optional [['?other "rdfs:label" '?otitle]]}
                                           {:optional [['?pred "rdfs:label" '?ptitle]]}]
                                   :order-asc '[?other ?pred]})]
-                 (prn :att attribs)
                  (html5
                   [:head
                    (apply include-css ["/css/bootstrap.min.css"])
@@ -75,34 +82,39 @@
                   [:body
                    [:div.container
                     [:div.row
-                     [:div.col-md-3] [:div.col-md-9 [:h1 (or ?title id)]]]
+                     [:div.col-sm-3] [:div.col-sm-9 [:h1 (or ?title id)]]]
                     [:div.row
-                     [:div.col-md-3
+                     [:div#sidebar.col-sm-3
                       (when (seq attribs)
                         (list
-                         [:h3 "Attribs"]
+                         [:h4 "Attribs"]
                          (map
                           (fn [[attr vals]]
                             (list
-                             [:h5 (resource-link attr)]
-                             [:ul (map (fn [{:syms [?val ?vtitle]}] [:li (resource-link ?val ?vtitle)]) vals)]))
-                          (sort-by key attribs))))]
-                     [:div.col-md-9
+                             [:h5.attrib (resource-link attr ((first vals) '?atitle))]
+                             (el/unordered-list (map (fn [{:syms [?val ?vtitle]}] (resource-link ?val ?vtitle)) vals))))
+                          (sort-by key attribs))
+                         [:select.form-control (form/select-options (sort (trio/predicates @graph)))]))]
+                     [:div.col-sm-9
                       [:form {:method :post :action (str "/resources/" id)}
                        [:div {:role "tabpanel"}
                         [:ul.nav.nav-tabs {:role "tablist"}
                          [:li.active {:role "presentation"} [:a {:href "#preview" :role "tab" :data-toggle "tab"} "Preview"]]
-                         [:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]]
+                         [:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]
+                         [:li {:role "presentation"} [:a {:href "#viz" :role "tab" :data-toggle "tab"} "Graph"]]]
                         [:div.tab-content
                          [:div#preview.tab-pane.fade.in.active {:role "tabpanel"}
                           [:div#preview-body.well (md/md-to-html-string ?body)]]
                          [:div#edit.tab-pane.fade {:role "tabpanel"}
+                          [:h3 "Edit resource description"]
                           [:p [:textarea#editor.form-control {:name "body" :rows 10} ?body]]
-                          [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]]]
-
+                          [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]
+                         [:div#viz.tab-pane.fade {:role "tabpanel"}
+                          [:h3 "Resource graph"]
+                          [:div.well [:h2 "TODO"]]]]]
                        (when (or (seq shared-pred) (seq shared-obj))
                          (list
-                          [:h2 "Related resources"]
+                          [:h3 "Related resources"]
                           [:table.table.table-striped
                            (map
                             (fn [{:syms [?other ?otitle ?val ?vtitle]}]
@@ -123,7 +135,8 @@
   :post! (fn [ctx]
            (dosync
             (let [{:keys [body title attribs]} (get-in ctx [:request :params])
-                  triples (cond-> [[id "dcterms:modified" (format-date (java.util.Date.))]]
+                  now (t/now)
+                  triples (cond-> [[id "dcterms:modified" (format-date now)]]
                                   body (conj [id "dcterms:content" body])
                                   title (conj [id "rdfs:label" title]))
                   remove-props (cond-> #{"dcterms:modified"}
@@ -131,7 +144,7 @@
                                        title (conj "rdfs:label"))
                   triples (->> attribs
                                (map (fn [[p o]] [id (name p) o]))
-                               (concat triples)
+                               (concat triples (date-triples id now))
                                (trio/triple-seq))]
               (alter graph
                      (fn [g]
