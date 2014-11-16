@@ -52,7 +52,7 @@
                                         :filter {'?att #(not (#{"dcterms:content" "rdfs:label"} %))}}
                                        {:optional [['?att "rdfs:label" '?atitle]]}
                                        {:optional [['?val "rdfs:label" '?vtitle]]}]
-                               :order-asc '[?att ?val]})
+                               :group '?att})
                      shared-pred (q/query
                                   {:select :*
                                    :from @graph
@@ -67,6 +67,7 @@
                                           {:optional [['?other "rdfs:label" '?otitle]]}
                                           {:optional [['?pred "rdfs:label" '?ptitle]]}]
                                   :order-asc '[?other ?pred]})]
+                 (prn :att attribs)
                  (html5
                   [:head
                    (apply include-css ["/css/bootstrap.min.css"])
@@ -74,8 +75,19 @@
                   [:body
                    [:div.container
                     [:div.row
-                     [:div.col-md-12
-                      [:h1 (or ?title id)]
+                     [:div.col-md-3] [:div.col-md-9 [:h1 (or ?title id)]]]
+                    [:div.row
+                     [:div.col-md-3
+                      (when (seq attribs)
+                        (list
+                         [:h3 "Attribs"]
+                         (map
+                          (fn [[attr vals]]
+                            (list
+                             [:h5 (resource-link attr)]
+                             [:ul (map (fn [{:syms [?val ?vtitle]}] [:li (resource-link ?val ?vtitle)]) vals)]))
+                          (sort-by key attribs))))]
+                     [:div.col-md-9
                       [:form {:method :post :action (str "/resources/" id)}
                        [:div {:role "tabpanel"}
                         [:ul.nav.nav-tabs {:role "tablist"}
@@ -83,23 +95,14 @@
                          [:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]]
                         [:div.tab-content
                          [:div#preview.tab-pane.fade.in.active {:role "tabpanel"}
-                          (md/md-to-html-string ?body)]
+                          [:div#preview-body.well (md/md-to-html-string ?body)]]
                          [:div#edit.tab-pane.fade {:role "tabpanel"}
                           [:p [:textarea#editor.form-control {:name "body" :rows 10} ?body]]
                           [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]]]
-                       (when (seq attribs)
-                         (list
-                          [:h2 "Attribs"]
-                          [:table.table.table-striped
-                           (map
-                            (fn [{:syms [?att ?atitle ?val ?vtitle]}]
-                              [:tr
-                               [:td (resource-link ?att ?atitle)]
-                               [:td (resource-link ?val ?vtitle)]])
-                            attribs)]))
+
                        (when (or (seq shared-pred) (seq shared-obj))
                          (list
-                          [:h2 "Other resources"]
+                          [:h2 "Related resources"]
                           [:table.table.table-striped
                            (map
                             (fn [{:syms [?other ?otitle ?val ?vtitle]}]
@@ -116,7 +119,7 @@
                                [:td (or ?title id)]])
                             shared-obj)]))]]]]
                    (el/javascript-tag
-                    "$(\"#editor\").blur(function(e){$(\"#preview\").html(marked(e.target.value));console.log(\"MD updated\");})")])))
+                    "$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));console.log(\"MD updated\");})")])))
   :post! (fn [ctx]
            (dosync
             (let [{:keys [body title attribs]} (get-in ctx [:request :params])
