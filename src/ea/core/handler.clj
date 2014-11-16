@@ -1,5 +1,6 @@
 (ns ea.core.handler
   (:require
+   [ea.core.view :as view]
    [compojure.core :refer :all]
    [compojure.route :as route]
    [liberator.core :as lib :refer [defresource]]
@@ -8,19 +9,14 @@
    [thi.ng.trio.query :as q]
    [clojure.edn :as edn]
    [clojure.string :as str]
-   [hiccup.page :refer [html5 include-js include-css]]
-   [hiccup.element :as el]
-   [hiccup.form :as form]
-   [markdown.core :as md]
    [clj-time.core :as t]
    [clj-time.format :as tf]))
 
 (def graph
-  (->> "graph.edn"
-       slurp
-       edn/read-string
-       (apply trio/plain-store)
-       ref))
+  (ref
+   (try
+     (->> "graph.edn" slurp edn/read-string (apply trio/plain-store))
+     (catch Exception e (trio/plain-store)))))
 
 (defn format-date
   [dt] (tf/unparse (tf/formatters :mysql) dt))
@@ -34,12 +30,6 @@
      [id "time:year-month" m]
      [id "time:year-month-day" d]]))
 
-(defn resource-link
-  [id & [label]]
-  (let [id (if (keyword? id) (name id) (str id))
-        uri (if (re-find #"^https?://" id) id (str "/resources/" id))]
-    [:a {:href uri} (or label id)]))
-
 (defn maybe-number
   [x] (try (Long/parseLong x) (catch Exception e x)))
 
@@ -49,76 +39,6 @@
        (str/split-lines)
        (map #(let [s (.indexOf % "=")] (if (>= s 0) [(subs % 0 s) (subs % (inc s))])))
        (into {})))
-
-(defn html-template
-  [& body]
-  (html5
-   [:head
-    (apply include-css ["/css/bootstrap.min.css" "/css/main.css"])
-    (apply include-js [ "/js/jquery-2.1.1.min.js" "/js/bootstrap.min.js" "/js/marked.min.js"])]
-   [:body
-    [:div.container-fluid body]
-    (el/javascript-tag
-     "$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));console.log(\"MD updated\");})")]))
-
-(defn attrib-sidebar
-  [attribs]
-  [:div#sidebar.col-sm-3.col-lg-2
-   [:h4 "Attributes "
-    [:span.label.label-default (reduce #(+ % (count (val %2))) 0 attribs)]]
-   (map
-    (fn [[attr vals]]
-      (list
-       [:h5.attrib (resource-link attr ((first vals) '?atitle))]
-       (el/unordered-list
-        (map
-         (fn [{:syms [?val ?vtitle]}] (resource-link ?val ?vtitle))
-         vals))))
-    (sort-by key attribs))
-   [:h4 "All attributes"]
-   [:select.form-control (form/select-options (sort (trio/predicates @graph)))]
-   [:h4 "Add attributes"]
-   [:p [:textarea.form-control {:name "new-attribs"}]]
-   [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]])
-
-(defn content-tab-panels
-  [body]
-  [:div {:role "tabpanel"}
-   [:ul.nav.nav-tabs {:role "tablist"}
-    [:li.active {:role "presentation"} [:a {:href "#preview" :role "tab" :data-toggle "tab"} "Preview"]]
-    [:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]
-    [:li {:role "presentation"} [:a {:href "#viz" :role "tab" :data-toggle "tab"} "Graph"]]]
-   [:div.tab-content
-    [:div#preview.tab-pane.fade.in.active {:role "tabpanel"}
-     [:div#preview-body.well (md/md-to-html-string body)]]
-    [:div#edit.tab-pane.fade {:role "tabpanel"}
-     [:h3 "Edit resource description"]
-     [:p [:textarea#editor.form-control {:name "body" :rows 10} body]]
-     [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]
-    [:div#viz.tab-pane.fade {:role "tabpanel"}
-     [:h3 "Resource graph"]
-     [:div.well [:h2 "TODO"]]]]])
-
-(defn related-resource-table
-  [id shared-pred shared-obj]
-  (list
-   [:h3 "Related resources "
-    [:span.label.label-default (+ (count shared-pred) (count shared-obj))]]
-   [:table.table.table-striped
-    (map
-     (fn [{:syms [?other ?otitle ?val ?vtitle]}]
-       [:tr
-        [:td (resource-link ?other ?otitle)]
-        [:td id]
-        [:td (resource-link ?val ?vtitle)]])
-     shared-pred)
-    (map
-     (fn [{:syms [?other ?otitle ?pred ?ptitle]}]
-       [:tr
-        [:td (resource-link ?other ?otitle)]
-        [:td (resource-link ?pred ?ptitle)]
-        [:td id]])
-     shared-obj)]))
 
 (defn handle-resource-update
   [ctx]
@@ -152,50 +72,53 @@
     (spit "graph.edn" (sort (trio/select @graph)))
     {::id id}))
 
+(defn handle-resource-get
+  [ctx]
+  (let [id (maybe-number (-> ctx :request :params :id))
+        {:syms [?body ?title] :as res}
+        (first (q/query
+                {:select :*
+                 :from @graph
+                 :query [{:where [[id "dcterms:content" '?body]]}
+                         {:optional [[id "rdfs:label" '?title]]}]}))
+        attribs (q/query
+                 {:select :*
+                  :from @graph
+                  :query [{:where [[id '?att '?val]]
+                           :filter {'?att #(not (#{"dcterms:content" "rdfs:label"} %))}}
+                          {:optional [['?att "rdfs:label" '?atitle]]}
+                          {:optional [['?val "rdfs:label" '?vtitle]]}]
+                  :group '?att})
+        shared-pred (q/query
+                     {:select :*
+                      :from @graph
+                      :query [{:where [['?other id '?val]]}
+                              {:optional [['?other "rdfs:label" '?otitle]]}
+                              {:optional [['?val "rdfs:label" '?vtitle]]}]
+                      :order-asc '[?other ?val]})
+        shared-obj (q/query
+                    {:select :*
+                     :from @graph
+                     :query [{:where [['?other '?pred id]]}
+                             {:optional [['?other "rdfs:label" '?otitle]]}
+                             {:optional [['?pred "rdfs:label" '?ptitle]]}]
+                     :order-asc '[?other ?pred]})
+        media-type (get-in ctx [:representation :media-type])]
+    (view/html-template
+     [:div.row
+      [:div.col-sm-3.col-lg-2] [:div.col-sm-9.col-lg-10 [:h1 (or ?title id)]]]
+     [:form {:method :post :action (str "/resources/" id)}
+      [:div.row
+       (view/attrib-sidebar @graph attribs)
+       [:div.col-sm-9.col-lg-10
+        (view/content-tab-panels ?body)
+        (when (or (seq shared-pred) (seq shared-obj))
+          (view/related-resource-table (or ?title id) shared-pred shared-obj))]]])))
+
 (defresource page [id]
   :available-media-types ["text/html" "application/edn"]
   :allowed-methods [:get :post :patch]
-  :handle-ok (fn [ctx]
-               (let [id (maybe-number id)
-                     {:syms [?body ?title] :as res}
-                     (first (q/query
-                             {:select :*
-                              :from @graph
-                              :query [{:where [[id "dcterms:content" '?body]]}
-                                      {:optional [[id "rdfs:label" '?title]]}]}))
-                     attribs (q/query
-                              {:select :*
-                               :from @graph
-                               :query [{:where [[id '?att '?val]]
-                                        :filter {'?att #(not (#{"dcterms:content" "rdfs:label"} %))}}
-                                       {:optional [['?att "rdfs:label" '?atitle]]}
-                                       {:optional [['?val "rdfs:label" '?vtitle]]}]
-                               :group '?att})
-                     shared-pred (q/query
-                                  {:select :*
-                                   :from @graph
-                                   :query [{:where [['?other id '?val]]}
-                                           {:optional [['?other "rdfs:label" '?otitle]]}
-                                           {:optional [['?val "rdfs:label" '?vtitle]]}]
-                                   :order-asc '[?other ?val]})
-                     shared-obj (q/query
-                                 {:select :*
-                                  :from @graph
-                                  :query [{:where [['?other '?pred id]]}
-                                          {:optional [['?other "rdfs:label" '?otitle]]}
-                                          {:optional [['?pred "rdfs:label" '?ptitle]]}]
-                                  :order-asc '[?other ?pred]})
-                     media-type (get-in ctx [:representation :media-type])]
-                 (html-template
-                  [:div.row
-                   [:div.col-sm-3.col-lg-2] [:div.col-sm-9.col-lg-10 [:h1 (or ?title id)]]]
-                  [:form {:method :post :action (str "/resources/" id)}
-                   [:div.row
-                    (attrib-sidebar attribs)
-                    [:div.col-sm-9.col-lg-10
-                     (content-tab-panels ?body)
-                     (when (or (seq shared-pred) (seq shared-obj))
-                       (related-resource-table (or ?title id) shared-pred shared-obj))]]])))
+  :handle-ok handle-resource-get  
   :post! handle-resource-update
   :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
 
