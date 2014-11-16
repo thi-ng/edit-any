@@ -1,0 +1,18 @@
+{"index" {"dcterms:content"
+          "# Welcome to EditAnything
+
+Use the Edit tab to change this content (using [GitHub flavored Markdown](https://help.github.com/articles/github-flavored-markdown/) syntax).
+
+## Add metadata
+
+Use the textbox in the sidebar to add more attributes to describe & link this resource:
+
+```
+dcterms:contributor=users:toxi
+sioc:topic=topics:wiki
+sioc:topic=topics:faceted-nav
+```"
+          "dcterms:creator" "users:ea"}
+ "users:ea" {"dcterms:content" "This is the EditAnything system user"
+             "rdfs:label" "EditAnything"}
+ "dcterms:creator" {"rdfs:label" "created by"}}

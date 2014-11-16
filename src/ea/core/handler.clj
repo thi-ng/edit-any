@@ -10,6 +10,7 @@
    [thi.ng.trio.query :as q]
    [clojure.edn :as edn]
    [clojure.data.json :as json]
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clj-time.core :as t]
    [clj-time.format :as tf]
@@ -19,7 +20,8 @@
   (ref
    (try
      (->> "graph.edn" slurp edn/read-string (apply trio/plain-store))
-     (catch Exception e (trio/plain-store)))))
+     (catch Exception e
+       (->> (io/resource "default-graph.edn") slurp edn/read-string trio/as-model)))))
 
 (defn format-date
   [dt] (tf/unparse (tf/formatters :mysql) dt))
@@ -40,8 +42,12 @@
   [src]
   (->> src
        (str/split-lines)
-       (map #(let [s (.indexOf % "=")] (if (>= s 0) [(subs % 0 s) (subs % (inc s))])))
-       (into {})))
+       (map
+        #(let [s (.indexOf % "=")]
+           (if (>= s 0) [(subs % 0 s) (subs % (inc s))])))
+       (filter identity)
+       (reduce
+        (fn [acc [k v]] (update-in acc [k] (fnil conj []) v)) {})))
 
 (defn handle-resource-update
   [ctx]
@@ -54,6 +60,7 @@
                              body  (conj "dcterms:content")
                              title (conj "rdfs:label"))
         attribs (merge (parse-bulk-attribs new-attribs) attribs)
+        _ (info :post-attribs attribs)
         triples (->> attribs
                      (map (fn [[p o]] [id (name p) o]))
                      (concat triples (date-triples id now))
@@ -129,6 +136,9 @@
                              {:optional [['?pred "rdfs:label" '?ptitle]]}]
                      :order-asc '[?other ?pred]})
         media-type (get-in ctx [:representation :media-type])]
+    (info :attribs attribs)
+    (info :shared-p shared-pred)
+    (info :shared-o shared-obj)
     (view/html-template
      [:div.row
       [:div.col-sm-3.col-lg-2] [:div.col-sm-9.col-lg-10 [:h1 (or ?title id)]]]
