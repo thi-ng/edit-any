@@ -87,12 +87,16 @@
                      [:div#sidebar.col-sm-3
                       (when (seq attribs)
                         (list
-                         [:h4 "Attribs"]
+                         [:h4 "Attributes "
+                          [:span.label.label-default (reduce #(+ % (count (val %2))) 0 attribs)]]
                          (map
                           (fn [[attr vals]]
                             (list
                              [:h5.attrib (resource-link attr ((first vals) '?atitle))]
-                             (el/unordered-list (map (fn [{:syms [?val ?vtitle]}] (resource-link ?val ?vtitle)) vals))))
+                             (el/unordered-list
+                              (map
+                               (fn [{:syms [?val ?vtitle]}] (resource-link ?val ?vtitle))
+                               vals))))
                           (sort-by key attribs))
                          [:select.form-control (form/select-options (sort (trio/predicates @graph)))]))]
                      [:div.col-sm-9
@@ -114,7 +118,8 @@
                           [:div.well [:h2 "TODO"]]]]]
                        (when (or (seq shared-pred) (seq shared-obj))
                          (list
-                          [:h3 "Related resources"]
+                          [:h3 "Related resources "
+                           [:span.label.label-default (+ (count shared-pred) (count shared-obj))]]
                           [:table.table.table-striped
                            (map
                             (fn [{:syms [?other ?otitle ?val ?vtitle]}]
