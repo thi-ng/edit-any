@@ -4,6 +4,7 @@
    [compojure.core :refer :all]
    [compojure.route :as route]
    [liberator.core :as lib :refer [defresource]]
+   [ring.util.response :as resp]
    [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
@@ -123,6 +124,7 @@
   :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
 
 (defroutes app-routes
+  (GET "/" [] (resp/redirect "/resources/index"))
   (ANY "/resources/:id" [id] (page id)))
 
 (def app

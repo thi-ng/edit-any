@@ -18,7 +18,7 @@
   (html5
    [:head
     (apply include-css ["/css/bootstrap.min.css" "/css/main.css"])
-    (apply include-js [ "/js/jquery-2.1.1.min.js" "/js/bootstrap.min.js" "/js/marked.min.js"])]
+    (apply include-js ["/js/jquery-2.1.1.min.js" "/js/bootstrap.min.js" "/js/marked.min.js"])]
    [:body
     [:div.container-fluid body]
     (el/javascript-tag
@@ -53,7 +53,7 @@
     [:li {:role "presentation"} [:a {:href "#viz" :role "tab" :data-toggle "tab"} "Graph"]]]
    [:div.tab-content
     [:div#preview.tab-pane.fade.in.active {:role "tabpanel"}
-     [:div#preview-body.well (md/md-to-html-string body)]]
+     [:div#preview-body (md/md-to-html-string body)]]
     [:div#edit.tab-pane.fade {:role "tabpanel"}
      [:h3 "Edit resource description"]
      [:p [:textarea#editor.form-control {:name "body" :rows 10} body]]
