@@ -73,7 +73,18 @@
     (spit "graph.edn" (sort (trio/select @graph)))
     {::id id}))
 
-(defn handle-resource-get
+(defmulti handle-resource-get #(-> % :representation :media-type))
+
+(defmethod handle-resource-get "application/edn"
+  [ctx]
+  (let [id (maybe-number (-> ctx :request :params :id))]
+    (vec (q/query
+          {:describe '?s
+           :from @graph
+           :query [{:where '[[?s ?p ?o]]}]
+           :values {'?s #{id}}}))))
+
+(defmethod handle-resource-get "text/html"
   [ctx]
   (let [id (maybe-number (-> ctx :request :params :id))
         {:syms [?body ?title] :as res}
@@ -119,7 +130,7 @@
 (defresource page [id]
   :available-media-types ["text/html" "application/edn"]
   :allowed-methods [:get :post :patch]
-  :handle-ok handle-resource-get  
+  :handle-ok handle-resource-get
   :post! handle-resource-update
   :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
 
