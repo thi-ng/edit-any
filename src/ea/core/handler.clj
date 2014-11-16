@@ -7,6 +7,7 @@
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
    [clojure.edn :as edn]
+   [clojure.string :as str]   
    [hiccup.page :refer [html5 include-js include-css]]
    [hiccup.element :as el]
    [hiccup.form :as form]
@@ -41,6 +42,13 @@
 
 (defn maybe-number
   [x] (try (Long/parseLong x) (catch Exception e x)))
+
+(defn parse-bulk-attribs
+  [src]
+  (->> src
+       (str/split-lines)
+       (map #(let [s (.indexOf % "=")] (if (>= s 0) [(subs % 0 s) (subs % (inc s))])))
+       (into {})))
 
 (defresource page [id]
   :available-media-types ["text/html" "application/edn"]
@@ -77,30 +85,31 @@
                                   :order-asc '[?other ?pred]})]
                  (html5
                   [:head
-                   (apply include-css ["/css/bootstrap.min.css"])
+                   (apply include-css ["/css/bootstrap.min.css" "/css/main.css"])
                    (apply include-js [ "/js/jquery-2.1.1.min.js" "/js/bootstrap.min.js" "/js/marked.min.js"])]
                   [:body
                    [:div.container
                     [:div.row
                      [:div.col-sm-3] [:div.col-sm-9 [:h1 (or ?title id)]]]
-                    [:div.row
-                     [:div#sidebar.col-sm-3
-                      (when (seq attribs)
-                        (list
-                         [:h4 "Attributes "
-                          [:span.label.label-default (reduce #(+ % (count (val %2))) 0 attribs)]]
-                         (map
-                          (fn [[attr vals]]
-                            (list
-                             [:h5.attrib (resource-link attr ((first vals) '?atitle))]
-                             (el/unordered-list
-                              (map
-                               (fn [{:syms [?val ?vtitle]}] (resource-link ?val ?vtitle))
-                               vals))))
-                          (sort-by key attribs))
-                         [:select.form-control (form/select-options (sort (trio/predicates @graph)))]))]
-                     [:div.col-sm-9
-                      [:form {:method :post :action (str "/resources/" id)}
+                    [:form {:method :post :action (str "/resources/" id)}
+                     [:div.row
+                      [:div#sidebar.col-sm-3
+                       [:h4 "Attributes "
+                        [:span.label.label-default (reduce #(+ % (count (val %2))) 0 attribs)]]
+                       (map
+                        (fn [[attr vals]]
+                          (list
+                           [:h5.attrib (resource-link attr ((first vals) '?atitle))]
+                           (el/unordered-list
+                            (map
+                             (fn [{:syms [?val ?vtitle]}] (resource-link ?val ?vtitle))
+                             vals))))
+                        (sort-by key attribs))
+                       #_[:select.form-control (form/select-options (sort (trio/predicates @graph)))]
+                       [:h4 "Add attributes"]
+                       [:p [:textarea.form-control {:name "new-attribs"}]]
+                       [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]
+                      [:div.col-sm-9
                        [:div {:role "tabpanel"}
                         [:ul.nav.nav-tabs {:role "tablist"}
                          [:li.active {:role "presentation"} [:a {:href "#preview" :role "tab" :data-toggle "tab"} "Preview"]]
@@ -139,7 +148,7 @@
                     "$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));console.log(\"MD updated\");})")])))
   :post! (fn [ctx]
            (dosync
-            (let [{:keys [body title attribs]} (get-in ctx [:request :params])
+            (let [{:keys [body title attribs new-attribs]} (get-in ctx [:request :params])
                   now (t/now)
                   triples (cond-> [[id "dcterms:modified" (format-date now)]]
                                   body (conj [id "dcterms:content" body])
@@ -147,10 +156,12 @@
                   remove-props (cond-> #{"dcterms:modified"}
                                        body  (conj "dcterms:content")
                                        title (conj "rdfs:label"))
+                  attribs (merge (parse-bulk-attribs new-attribs) attribs)
                   triples (->> attribs
                                (map (fn [[p o]] [id (name p) o]))
                                (concat triples (date-triples id now))
                                (trio/triple-seq))]
+              (prn :new-attribs new-attribs)
               (alter graph
                      (fn [g]
                        (let [old (q/query
