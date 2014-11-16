@@ -6,14 +6,25 @@
    [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
-   [clojure.pprint :refer [pprint]]))
+   [clojure.edn :as edn]
+   [hiccup.page :refer [html5 include-js include-css]]
+   [hiccup.element :as el]
+   [markdown.core :as md]))
 
-(def date-format (java.text.SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
+(def graph
+  (->> "graph.edn"
+       slurp
+       edn/read-string
+       (apply trio/plain-store)
+       ref))
+
+(def date-format (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss"))
+
+(defn format-date
+  [d] (.format date-format d))
 
 (defn format-timestamp
   [t] (.format date-format (java.util.Date. t)))
-
-(defonce graph (ref (trio/plain-store)))
 
 (defn resource-link
   [id & [label]]
@@ -25,7 +36,7 @@
 
 (defresource page [id]
   :available-media-types ["text/html" "application/edn"]
-  :allowed-methods [:get :post :put]
+  :allowed-methods [:get :post :patch]
   :handle-ok (fn [ctx]
                (let [id (maybe-number id)
                      {:syms [?body ?title] :as res}
@@ -56,48 +67,68 @@
                                           {:optional [['?other "rdfs:label" '?otitle]]}
                                           {:optional [['?pred "rdfs:label" '?ptitle]]}]
                                   :order-asc '[?other ?pred]})]
-                 (str
-                  "<h1>" (or ?title id) "</h1>"
-                  "<form method=\"post\" action=\"/resources/" id "\">"
-                  "<p><textarea name=\"body\">" ?body "</textarea></p>"
-                  "<p><input type=\"submit\"/></p>"
-                  (when (seq attribs)
-                    (str "<h2>Attribs</h2>"
-                         "<table>"
-                         (->> attribs
-                              (map (fn [{:syms [?att ?atitle ?val ?vtitle]}]
-                                     (str "<tr><td>" (resource-link ?att ?atitle) "</td>"
-                                          "<td>" (resource-link ?val ?vtitle) "</td></tr>")))
-                              (apply str))
-                         "</table>"))
-                  (when (or (seq shared-pred) (seq shared-obj))
-                    (str "<h2>Other resources</h2>"
-                         "<table>"
-                         (->> shared-pred
-                              (map (fn [{:syms [?other ?otitle ?val ?vtitle]}]
-                                     (str "<tr><td>" (resource-link ?other ?otitle) "</td>"
-                                          "<td>" (or ?title id) "</td>"
-                                          "<td>" (resource-link ?val ?vtitle) "</td></tr>")))
-                              (apply str))
-                         (->> shared-obj
-                              (map (fn [{:syms [?other ?otitle ?pred ?ptitle]}]
-                                     (str "<tr><td>" (resource-link ?other ?otitle) "</td>"
-                                          "<td>" (resource-link ?pred ?ptitle) "</td>"
-                                          "<td>" (or ?title id) "</td></tr>")))
-                              (apply str))
-                         "</table>"))
-                  "</form>")))
+                 (html5
+                  [:head
+                   (apply include-css ["/css/bootstrap.min.css"])
+                   (apply include-js [ "/js/jquery-2.1.1.min.js" "/js/bootstrap.min.js" "/js/marked.min.js"])]
+                  [:body
+                   [:div.container
+                    [:div.row
+                     [:div.col-md-12
+                      [:h1 (or ?title id)]
+                      [:form {:method :post :action (str "/resources/" id)}
+                       [:div {:role "tabpanel"}
+                        [:ul.nav.nav-tabs {:role "tablist"}
+                         [:li.active {:role "presentation"} [:a {:href "#preview" :role "tab" :data-toggle "tab"} "Preview"]]
+                         [:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]]
+                        [:div.tab-content
+                         [:div#preview.tab-pane.fade.in.active {:role "tabpanel"}
+                          (md/md-to-html-string ?body)]
+                         [:div#edit.tab-pane.fade {:role "tabpanel"}
+                          [:p [:textarea#editor.form-control {:name "body" :rows 10} ?body]]
+                          [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]]]
+                       (when (seq attribs)
+                         (list
+                          [:h2 "Attribs"]
+                          [:table.table.table-striped
+                           (map
+                            (fn [{:syms [?att ?atitle ?val ?vtitle]}]
+                              [:tr
+                               [:td (resource-link ?att ?atitle)]
+                               [:td (resource-link ?val ?vtitle)]])
+                            attribs)]))
+                       (when (or (seq shared-pred) (seq shared-obj))
+                         (list
+                          [:h2 "Other resources"]
+                          [:table.table.table-striped
+                           (map
+                            (fn [{:syms [?other ?otitle ?val ?vtitle]}]
+                              [:tr
+                               [:td (resource-link ?other ?otitle)]
+                               [:td (or ?title id)]
+                               [:td (resource-link ?val ?vtitle)]])
+                            shared-pred)
+                           (map
+                            (fn [{:syms [?other ?otitle ?pred ?ptitle]}]
+                              [:tr
+                               [:td (resource-link ?other ?otitle)]
+                               [:td (resource-link ?pred ?ptitle)]
+                               [:td (or ?title id)]])
+                            shared-obj)]))]]]]
+                   (el/javascript-tag
+                    "$(\"#editor\").blur(function(e){$(\"#preview\").html(marked(e.target.value));console.log(\"MD updated\");})")])))
   :post! (fn [ctx]
            (dosync
             (let [{:keys [body title attribs]} (get-in ctx [:request :params])
-                  add-props (cond-> [[id "dcterms:modified" (format-timestamp (System/currentTimeMillis))]]
-                                    body (conj [id "dcterms:content" body])
-                                    title (conj [id "rdfs:label" title]))
+                  triples (cond-> [[id "dcterms:modified" (format-date (java.util.Date.))]]
+                                  body (conj [id "dcterms:content" body])
+                                  title (conj [id "rdfs:label" title]))
                   remove-props (cond-> #{"dcterms:modified"}
                                        body  (conj "dcterms:content")
                                        title (conj "rdfs:label"))
-                  triples (->> (map (fn [[p o]] [id (name p) o]) attribs)
-                               (concat add-props)
+                  triples (->> attribs
+                               (map (fn [[p o]] [id (name p) o]))
+                               (concat triples)
                                (trio/triple-seq))]
               (alter graph
                      (fn [g]
@@ -106,8 +137,8 @@
                                    :from g
                                    :query [{:where [['?s '?p '?o]]}]
                                    :values {'?s #{id} '?p remove-props}})]
-                         (prn :old old)
-                         (prn :new triples)
+                         ;;(prn :old old)
+                         ;;(prn :new triples)
                          (-> g
                              (trio/remove-triples old)
                              (trio/add-triples triples)))))

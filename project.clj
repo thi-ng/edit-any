@@ -6,7 +6,9 @@
                  [compojure "1.2.0"]
                  [ring/ring-defaults "0.1.2"]
                  [liberator "0.12.2"]
-                 [thi.ng/trio "0.1.0-SNAPSHOT"]]
+                 [thi.ng/trio "0.1.0-SNAPSHOT"]
+                 [hiccup "1.0.5"]
+                 [markdown-clj "0.9.57" :exclusions [org.clojure/clojure]]]
   :plugins [[lein-ring "0.8.13"]]
   :ring {:handler ea.core.handler/app}
   :profiles
