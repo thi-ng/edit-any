@@ -1,3 +1,11 @@
 #sidebar {
-    border-right: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+}
+
+#sidebar .attribs {
+    font-size: 85%;
+}
+
+a.delete {
+  color: red;
 }

@@ -1,39 +1,40 @@
-{"rdf"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://www.w3.org/1999/02/22-rdf-syntax-ns#"}
- "rdfs"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://www.w3.org/2000/01/rdf-schema#"}
- "owl"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://www.w3.org/2002/07/owl#"}
- "dcterms"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://purl.org/dc/terms/"}
- "dctypes"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://purl.org/dc/dcmitype/"}
- "foaf"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://xmlns.com/foaf/0.1/"}
- "skos"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://www.w3.org/2004/02/skos/core#"}
- "schema"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://schema.org/"}
- "void"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://vocab.deri.ie/void"}
- "ea"
- {"rdf:type" "void:Dataset"
-  "void:uriSpace" "http://thi.ng/owl/ea/"}
+[[["http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    "http://www.w3.org/2000/01/rdf-schema#"
+    "http://www.w3.org/2002/07/owl#"
+    "http://purl.org/dc/terms/"
+    "http://purl.org/dc/dcmitype/"
+    "http://xmlns.com/foaf/0.1/"
+    "http://www.w3.org/2004/02/skos/core#"
+    "http://schema.org/"
+    "http://vocab.deri.ie/void"
+    "http://thi.ng/owl/edit-any/"]
+  "rdf:type" "owl:Ontology"]
+ {"rdf"    {"rdf:type" "rdf:Description"
+            "rdf:about" "http://www.w3.org/1999/02/22-rdf-syntax-ns#"}
+  "rdfs"    {"rdf:type" "rdf:Description"
+             "rdf:about" "http://www.w3.org/2000/01/rdf-schema#"}
+  "owl"     {"rdf:type" "rdf:Description"
+             "rdf:about" "http://www.w3.org/2002/07/owl#"}
+  "dcterms" {"rdf:type" "rdf:Description"
+             "rdf:about" "http://purl.org/dc/terms/"}
+  "dctypes" {"rdf:type" "rdf:Description"
+             "rdf:about" "http://purl.org/dc/dcmitype/"}
+  "foaf"    {"rdf:type" "rdf:Description"
+             "rdf:about" "http://xmlns.com/foaf/0.1/"}
+  "skos"    {"rdf:type" "rdf:Description"
+             "rdf:about" "http://www.w3.org/2004/02/skos/core#"}
+  "schema"  {"rdf:type" "rdf:Description"
+             "rdf:about" "http://schema.org/"}
+  "void"    {"rdf:type" "rdf:Description"
+             "rdf:about" "http://vocab.deri.ie/void"}
+  "ea"      {"rdf:type" "rdf:Description"
+             "rdf:about" "http://thi.ng/owl/edit-any/"}
 
- ;; default page
- 
- "Index"
- {"dcterms:description"
-  "# Welcome to EditAnything
+  ;; default page
+
+  "Index"
+  {"dcterms:description"
+   "# Welcome to EditAnything
 
 Use the Edit tab to change this content (using [GitHub flavored Markdown](https://help.github.com/articles/github-flavored-markdown/) syntax).
 
@@ -46,13 +47,14 @@ dcterms:contributor=toxi
 sioc:topic=topics:wiki
 sioc:topic=topics:faceted-nav
 ```"
-  "dcterms:creator" "EA"}
+   "dcterms:format" "text/x-markdown"
+   "dcterms:creator" "EA"}
 
- ;; system user
+  ;; system user
 
- "EA" {"dcterms:description" "This is the EditAnything system user"
-       "rdfs:label" "EditAnything"
-       "rdf:type" "foaf:Agent"
-       "foaf:homepage" "https://github.com/postspectacular/edit-any"}
+  "EA" {"dcterms:description" "This is the EditAnything system user"
+        "rdfs:label" "EditAnything"
+        "rdf:type" "foaf:Agent"
+        "foaf:homepage" "https://github.com/postspectacular/edit-any"}
 
- "dcterms:creator" {"rdfs:label" "created by"}}
+  "dcterms:creator" {"rdfs:label" "created by"}}]

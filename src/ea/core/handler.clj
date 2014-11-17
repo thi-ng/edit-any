@@ -16,12 +16,34 @@
    [clj-time.format :as tf]
    [taoensso.timbre :refer [info warn error]]))
 
+(taoensso.timbre/set-config!
+ [:ns-blacklist] '[thi.ng.trio.query])
+
+(def prefixes (ref {}))
+
 (def graph
   (ref
    (try
      (->> "graph.edn" slurp edn/read-string trio/as-model)
      (catch Exception e
        (->> "default-graph.edn" io/resource slurp edn/read-string trio/as-model)))))
+
+(defn update-prefixes!
+  []
+  (dosync
+   (alter
+    prefixes
+    (fn [_]
+      (->> (q/query
+            {:select :*
+             :from @graph
+             :query [{:where [['?p "rdf:type" "rdf:Description"]
+                              ['?p "rdf:about" '?uri]
+                              ['?uri "rdf:type" "owl:Ontology"]]}]})
+           (reduce (fn [acc {:syms [?p ?uri]}] (assoc acc ?p ?uri)) {})))))
+  (info :prefixes @prefixes))
+
+(update-prefixes!)
 
 (defn format-date
   [dt] (tf/unparse (tf/formatters :mysql) dt))
@@ -38,20 +60,30 @@
 (defn maybe-number
   [x] (try (Long/parseLong x) (catch Exception e x)))
 
+(defn valid-pname-prefix?
+  [prefixes pname]
+  (let [[pre] (str/split pname #":")]
+    (prefixes pre)))
+
 (defn parse-attribs
   [src]
   (->> src
        (str/split-lines)
        (map
         #(let [s (.indexOf % "=")]
-           (if (>= s 0) [(subs % 0 s) (subs % (inc s))])))
+           (if (>= s 0)
+             (let [pname (subs % 0 s)
+                   [prefix] (valid-pname-prefix? @prefixes pname)]
+               (if prefix
+                 [pname (subs % (inc s))]
+                 (warn "unknown prefix in pname:" pname))))))
        (filter identity)
        (reduce
         (fn [acc [k v]] (update-in acc [k] (fnil conj []) v)) {})))
 
 (defn handle-resource-update
   [ctx]
-  (let [{:keys [id body title attribs new-attribs]} (get-in ctx [:request :params])
+  (let [{:keys [id body title attribs new-attribs replace]} (get-in ctx [:request :params])
         now (t/now)
         triples (cond-> [[id "dcterms:modified" (format-date now)]]
                         body (conj [id "dcterms:description" body])
@@ -65,7 +97,7 @@
                      (map (fn [[p o]] [id (name p) o]))
                      (concat triples (date-triples id now))
                      (trio/triple-seq))]
-    (prn :new-attribs new-attribs)
+    (prn :new-attribs attribs)
     (dosync
      (alter graph
             (fn [g]
@@ -80,6 +112,7 @@
                     (trio/remove-triples old)
                     (trio/add-triples triples))))))
     (spit "graph.edn" (sort (trio/select @graph)))
+    (update-prefixes!)
     {::id id}))
 
 (defn describe-resource
@@ -108,11 +141,12 @@
   [ctx]
   (let [id (maybe-number (-> ctx :request :params :id))
         {:syms [?body ?title] :as res}
-        (first (q/query
-                {:select :*
-                 :from @graph
-                 :query [{:where [[id "dcterms:description" '?body]]}
-                         {:union [[id "rdfs:label" '?title]]}]}))
+        (first
+         (q/query
+          {:select :*
+           :from @graph
+           :query [{:where [[id "dcterms:description" '?body]]}
+                   {:union [[id "rdfs:label" '?title]]}]}))
         attribs (q/query
                  {:select :*
                   :from @graph
@@ -134,22 +168,21 @@
                      :query [{:where [['?other '?pred id]]}
                              {:optional [['?other "rdfs:label" '?otitle]]}
                              {:optional [['?pred "rdfs:label" '?ptitle]]}]
-                     :order-asc '[?other ?pred]})
-        media-type (get-in ctx [:representation :media-type])]
-    (info :title ?title)
-    (info :attribs attribs)
-    (info :shared-p shared-pred)
-    (info :shared-o shared-obj)
+                     :order-asc '[?other ?pred]})]
+    ;;(info id :title ?title)
+    ;;(info id :attribs attribs)
+    ;;(info id :shared-p shared-pred)
+    ;;(info id :shared-o shared-obj)
     (view/html-template
      [:div.row
-      [:div.col-sm-3.col-lg-2] [:div.col-sm-9.col-lg-10 [:h1 (or ?title id)]]]
+      [:div.col-xs-12 [:h1 (or ?title id)]]]
      [:form {:method :post :action (str "/resources/" id)}
       [:div.row
-       (view/attrib-sidebar @graph attribs)
-       [:div.col-sm-9.col-lg-10
+       [:div.col-sm-8.col-md-9
         (view/content-tab-panels ?body)
         (when (or (seq shared-pred) (seq shared-obj))
-          (view/related-resource-table (or ?title id) shared-pred shared-obj))]]])))
+          (view/related-resource-table @prefixes (or ?title id) shared-pred shared-obj))]
+       (view/attrib-sidebar @prefixes @graph attribs)]])))
 
 (defresource resource [id]
   :available-media-types ["text/html" "application/edn" "application/json"]

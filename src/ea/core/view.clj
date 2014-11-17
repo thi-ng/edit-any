@@ -1,6 +1,7 @@
 (ns ea.core.view
   (:require
    [thi.ng.trio.core :as trio]
+   [thi.ng.trio.vocabs.utils :as vu]
    [clojure.string :as str]
    [hiccup.page :refer [html5 include-js include-css]]
    [hiccup.element :as el]
@@ -8,13 +9,21 @@
    [markdown.core :as md]))
 
 (defn resource-link
-  [id & [label]]
+  [prefixes id label & [trunc]]
   (let [id (if (keyword? id) (name id) (str id))
-        uri? (re-find #"^((https?|mailto|ftp)://|([a-zA-Z0-9]+:[a-zA-Z0-9]+))" id)
-        uri (str "/resources/" id)]
+        uri? (re-seq #"^(https?|mailto|ftp)://" id)
+        pname? (re-seq #"^([a-zA-Z0-9]+:[a-zA-Z0-9]+)" id)
+        res-uri (str "/resources/" id)
+        exp-uri (if pname? (vu/expand-prefixes prefixes id) id)
+        label (or label (if uri? (subs id (count (ffirst uri?))) id))
+        label (if (and trunc (> (count label) trunc))
+                (str (subs label 0 trunc) "\u2026")
+                label)]
     (list
-     [:a {:href uri} (or label id)] " "
-     (if uri? [:a {:href id} [:span.glyphicon.glyphicon-new-window]]))))
+     [:a {:href res-uri :title res-uri} label] " "
+     (if (or uri? pname?)
+       [:a {:href exp-uri :title exp-uri}
+        [:span.glyphicon.glyphicon-new-window]]))))
 
 (defn html-template
   [& body]
@@ -28,24 +37,29 @@
      "$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));})")]))
 
 (defn attrib-sidebar
-  [graph attribs]
-  [:div#sidebar.col-sm-3.col-lg-2
+  [prefixes graph attribs]
+  [:div#sidebar.col-sm-4.col-md-3
    [:h4 "Attributes "
     [:span.label.label-default (reduce #(+ % (count (val %2))) 0 attribs)]]
-   (map
-    (fn [[attr vals]]
-      (list
-       [:h5.attrib (resource-link attr ((first vals) '?atitle))]
-       (el/unordered-list
-        (map
-         (fn [{:syms [?val ?vtitle]}] (resource-link ?val ?vtitle))
-         vals))))
-    (sort-by key attribs))
-   [:h4 "All attributes"]
+   [:div.attribs
+    (map
+     (fn [[attr vals]]
+       (list
+        [:h5.attrib (resource-link prefixes attr ((first vals) '?atitle) 30)]
+        (el/unordered-list
+         (map
+          (fn [{:syms [?val ?vtitle]}]
+            (list
+             (resource-link prefixes ?val ?vtitle 30) " "
+             [:a.delete {:href "#"} [:span.glyphicon.glyphicon-remove]]))
+          vals))))
+     (sort-by key attribs))]
+   [:h4 "All used attributes"]
    [:select.form-control (form/select-options (sort (trio/predicates graph)))]
    [:h4 "Add attributes"]
-   [:p [:textarea.form-control {:name "new-attribs"}]]
-   [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]])
+   [:div.form-group [:textarea.form-control {:name "new-attribs"}]]
+   [:div.checkbox [:label [:input {:type "checkbox" :name "replace"}] " Replace existing"]]
+   [:div.form-group [:button.btn.btn-primary {:type "submit"} "Submit"]]])
 
 (defn content-tab-panels
   [body]
@@ -66,7 +80,7 @@
      [:div.well [:h2 "TODO"]]]]])
 
 (defn related-resource-table
-  [id shared-pred shared-obj]
+  [prefixes id shared-pred shared-obj]
   (list
    [:h3 "Related resources "
     [:span.label.label-default (+ (count shared-pred) (count shared-obj))]]
@@ -74,14 +88,14 @@
     (map
      (fn [{:syms [?other ?otitle ?val ?vtitle]}]
        [:tr
-        [:td (resource-link ?other ?otitle)]
+        [:td (resource-link prefixes ?other ?otitle)]
         [:td id]
-        [:td (resource-link ?val ?vtitle)]])
+        [:td (resource-link prefixes ?val ?vtitle)]])
      shared-pred)
     (map
      (fn [{:syms [?other ?otitle ?pred ?ptitle]}]
        [:tr
-        [:td (resource-link ?other ?otitle)]
-        [:td (resource-link ?pred ?ptitle)]
+        [:td (resource-link prefixes ?other ?otitle)]
+        [:td (resource-link prefixes ?pred ?ptitle)]
         [:td id]])
      shared-obj)]))
