@@ -10,8 +10,11 @@
 (defn resource-link
   [id & [label]]
   (let [id (if (keyword? id) (name id) (str id))
-        uri (if (re-find #"^https?://" id) id (str "/resources/" id))]
-    [:a {:href uri} (or label id)]))
+        uri? (re-find #"^((https?|mailto|ftp)://|([a-zA-Z0-9]+:[a-zA-Z0-9]+))" id)
+        uri (str "/resources/" id)]
+    (list
+     [:a {:href uri} (or label id)] " "
+     (if uri? [:a {:href id} [:span.glyphicon.glyphicon-new-window]]))))
 
 (defn html-template
   [& body]

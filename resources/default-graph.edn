@@ -1,5 +1,39 @@
-{"index" {"dcterms:content"
-          "# Welcome to EditAnything
+{"rdf"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://www.w3.org/1999/02/22-rdf-syntax-ns#"}
+ "rdfs"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://www.w3.org/2000/01/rdf-schema#"}
+ "owl"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://www.w3.org/2002/07/owl#"}
+ "dcterms"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://purl.org/dc/terms/"}
+ "dctypes"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://purl.org/dc/dcmitype/"}
+ "foaf"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://xmlns.com/foaf/0.1/"}
+ "skos"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://www.w3.org/2004/02/skos/core#"}
+ "schema"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://schema.org/"}
+ "void"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://vocab.deri.ie/void"}
+ "ea"
+ {"rdf:type" "void:Dataset"
+  "void:uriSpace" "http://thi.ng/owl/ea/"}
+
+ ;; default page
+ 
+ "Index"
+ {"dcterms:description"
+  "# Welcome to EditAnything
 
 Use the Edit tab to change this content (using [GitHub flavored Markdown](https://help.github.com/articles/github-flavored-markdown/) syntax).
 
@@ -8,11 +42,17 @@ Use the Edit tab to change this content (using [GitHub flavored Markdown](https:
 Use the textbox in the sidebar to add more attributes to describe & link this resource:
 
 ```
-dcterms:contributor=users:toxi
+dcterms:contributor=toxi
 sioc:topic=topics:wiki
 sioc:topic=topics:faceted-nav
 ```"
-          "dcterms:creator" "users:ea"}
- "users:ea" {"dcterms:content" "This is the EditAnything system user"
-             "rdfs:label" "EditAnything"}
+  "dcterms:creator" "EA"}
+
+ ;; system user
+
+ "EA" {"dcterms:description" "This is the EditAnything system user"
+       "rdfs:label" "EditAnything"
+       "rdf:type" "foaf:Agent"
+       "foaf:homepage" "https://github.com/postspectacular/edit-any"}
+
  "dcterms:creator" {"rdfs:label" "created by"}}

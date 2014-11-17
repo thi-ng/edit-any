@@ -19,9 +19,9 @@
 (def graph
   (ref
    (try
-     (->> "graph.edn" slurp edn/read-string (apply trio/plain-store))
+     (->> "graph.edn" slurp edn/read-string trio/as-model)
      (catch Exception e
-       (->> (io/resource "default-graph.edn") slurp edn/read-string trio/as-model)))))
+       (->> "default-graph.edn" io/resource slurp edn/read-string trio/as-model)))))
 
 (defn format-date
   [dt] (tf/unparse (tf/formatters :mysql) dt))
@@ -38,7 +38,7 @@
 (defn maybe-number
   [x] (try (Long/parseLong x) (catch Exception e x)))
 
-(defn parse-bulk-attribs
+(defn parse-attribs
   [src]
   (->> src
        (str/split-lines)
@@ -54,12 +54,12 @@
   (let [{:keys [id body title attribs new-attribs]} (get-in ctx [:request :params])
         now (t/now)
         triples (cond-> [[id "dcterms:modified" (format-date now)]]
-                        body (conj [id "dcterms:content" body])
+                        body (conj [id "dcterms:description" body])
                         title (conj [id "rdfs:label" title]))
         remove-props (cond-> #{"dcterms:modified"}
-                             body  (conj "dcterms:content")
+                             body  (conj "dcterms:description")
                              title (conj "rdfs:label"))
-        attribs (merge (parse-bulk-attribs new-attribs) attribs)
+        attribs (merge (parse-attribs new-attribs) attribs)
         _ (info :post-attribs attribs)
         triples (->> attribs
                      (map (fn [[p o]] [id (name p) o]))
@@ -111,13 +111,13 @@
         (first (q/query
                 {:select :*
                  :from @graph
-                 :query [{:where [[id "dcterms:content" '?body]]}
-                         {:optional [[id "rdfs:label" '?title]]}]}))
+                 :query [{:where [[id "dcterms:description" '?body]]}
+                         {:union [[id "rdfs:label" '?title]]}]}))
         attribs (q/query
                  {:select :*
                   :from @graph
                   :query [{:where [[id '?att '?val]]
-                           :filter {'?att #(not (#{"dcterms:content" "rdfs:label"} %))}}
+                           :filter {'?att #(not (#{"dcterms:description" "rdfs:label"} %))}}
                           {:optional [['?att "rdfs:label" '?atitle]]}
                           {:optional [['?val "rdfs:label" '?vtitle]]}]
                   :group '?att})
@@ -136,6 +136,7 @@
                              {:optional [['?pred "rdfs:label" '?ptitle]]}]
                      :order-asc '[?other ?pred]})
         media-type (get-in ctx [:representation :media-type])]
+    (info :title ?title)
     (info :attribs attribs)
     (info :shared-p shared-pred)
     (info :shared-o shared-obj)
@@ -158,8 +159,8 @@
   :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
 
 (defroutes app-routes
-  (GET "/" [] (resp/redirect "/resources/index"))
-  (ANY "/resources/:id" [id] (resource id)))
+  (GET "/" [] (resp/redirect "/resources/Index"))
+  (ANY ["/resources/:id" :id #".*"] [id] (resource id)))
 
 (def app
   (->> (assoc-in site-defaults [:security :anti-forgery] false)
