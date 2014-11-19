@@ -18,11 +18,11 @@
    [clj-time.format :as tf]
    [taoensso.timbre :refer [info warn error]]))
 
-(taoensso.timbre/set-config!
- [:ns-blacklist] [])
+;; (taoensso.timbre/set-config! [:ns-blacklist] ['thi.ng.trio.query])
 
-(def state
-  (ref {}))
+;; (taoensso.timbre/set-config! [:ns-blacklist] [])
+
+(def state (ref {}))
 
 (defn build-prefixes
   [{:strs [ea owl rdf]} graph]
@@ -92,12 +92,13 @@
           (fn [acc [k v]] (update-in acc [k] (fnil conj []) v)) {}))))
 
 (defn attrib-templates
-  [{:strs [ea dcterms rdf]} graph]
+  [{:strs [ea dcterms rdf] :as prefixes} graph]
   (q/query
-   {:select [{:id '?id} {:tpl '?tpl}]
+   {:select [{:id {:use '?id :fn #(view/fmt-pname (vu/find-prefix prefixes %))}}
+             {:tpl '?tpl}]
     :from graph
-    :query [{:where '[[?id (str rdf "type") (str ea "AttributeCollection")]
-                      [?id (str dcterms "description") ?tpl]]}]}))
+    :query [{:where [['?id (str rdf "type") (str ea "AttributeCollection")]
+                     ['?id (str dcterms "description") '?tpl]]}]}))
 (defn new-resource?
   [id] (nil? (seq (trio/select (:graph @state) (maybe-number id) nil nil))))
 
@@ -222,6 +223,9 @@
            :from graph
            :query [{:where [[id (str dcterms "description") '?body]]}
                    {:union [[id (str rdfs "label") '?title]]}]}))
+        ?title (or ?title
+                   (if-let [pn (vu/find-prefix prefixes id)]
+                     (if (= "this" (pn 0)) (pn 1) (view/fmt-pname pn))))
         template (build-resource-template prefixes graph id)
         attribs (q/query
                  {:select :*
@@ -251,7 +255,7 @@
     ;;(info id :shared-o shared-obj)
     (view/html-template
      [:div.row
-      [:div.col-xs-12 [:h1 (or ?title id)]]]
+      [:div.col-xs-12 [:h1 ?title]]]
      [:form {:method :post :action (str "/resources/" id)}
       [:div.row
        [:div.col-sm-8.col-md-9
@@ -268,7 +272,7 @@
   :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
 
 (defroutes app-routes
-  (GET "/" [] (resp/redirect (str "/resources/this:Index")))
+  (GET "/" [] (resp/redirect (str "/resources/Index")))
   (ANY ["/resources/:id" :id #".*"] [id] (resource id)))
 
 (def app

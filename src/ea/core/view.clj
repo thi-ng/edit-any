@@ -24,7 +24,7 @@
   (let [id (if (keyword? id) (name id) (str id))
         uri? (re-seq #"^(https?|mailto|ftp)://" id)
         pname (if-let [pn (vu/find-prefix prefixes id)]
-                (fmt-pname pn))
+                (if (= "this" (pn 0)) (pn 1) (fmt-pname pn)))
         res-uri (str "/resources/" (or pname id))
         label (or label
                   (if uri?
@@ -104,7 +104,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
      (fn [{:syms [?other ?otitle ?val ?vtitle]}]
        [:tr
         [:td (resource-link prefixes ?other ?otitle)]
-        [:td id]
+        [:td (resource-link prefixes id nil)]
         [:td (resource-link prefixes ?val ?vtitle)]])
      shared-pred)
     (map
@@ -112,5 +112,5 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
        [:tr
         [:td (resource-link prefixes ?other ?otitle)]
         [:td (resource-link prefixes ?pred ?ptitle)]
-        [:td id]])
+        [:td (resource-link prefixes id nil)]])
      shared-obj)]))
