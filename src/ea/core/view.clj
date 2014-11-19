@@ -34,10 +34,11 @@
    [:body
     [:div.container-fluid body]
     (el/javascript-tag
-     "$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));})")]))
+     "$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));});
+$(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-attribs\").val(e.target.value);});")]))
 
 (defn attrib-sidebar
-  [prefixes graph attribs]
+  [prefixes graph attribs templates]
   [:div#sidebar.col-sm-4.col-md-3
    [:h4 "Attributes "
     [:span.label.label-default (reduce #(+ % (count (val %2))) 0 attribs)]]
@@ -54,20 +55,20 @@
              [:a.delete {:href "#"} [:span.glyphicon.glyphicon-remove]]))
           vals))))
      (sort-by key attribs))]
-   [:h4 "All used attributes"]
-   [:select.form-control (form/select-options (sort (trio/predicates graph)))]
    [:h4 "Add attributes"]
-   [:div.form-group [:textarea.form-control {:name "new-attribs"}]]
+   [:div.form-group [:textarea#new-attribs.form-control {:name "new-attribs"}]]
+   [:select#attr-templates.form-control (map (fn [{:keys [id tpl]}] [:option {:label id :value tpl}]) (cons {:id "Choose template..":value ""} templates))]
    [:div.checkbox [:label [:input {:type "checkbox" :name "replace"}] " Replace existing"]]
    [:div.form-group [:button.btn.btn-primary {:type "submit"} "Submit"]]])
 
 (defn content-tab-panels
-  [body]
+  [body tpl]
   [:div {:role "tabpanel"}
    [:ul.nav.nav-tabs {:role "tablist"}
     [:li.active {:role "presentation"} [:a {:href "#preview" :role "tab" :data-toggle "tab"} "Preview"]]
     [:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]
-    [:li {:role "presentation"} [:a {:href "#viz" :role "tab" :data-toggle "tab"} "Graph"]]]
+    [:li {:role "presentation"} [:a {:href "#viz" :role "tab" :data-toggle "tab"} "Graph"]]
+    [:li {:role "presentation"} [:a {:href "#tpl" :role "tab" :data-toggle "tab"} "Template"]]]
    [:div.tab-content
     [:div#preview.tab-pane.fade.in.active {:role "tabpanel"}
      [:div#preview-body (md/md-to-html-string body)]]
@@ -77,7 +78,8 @@
      [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]
     [:div#viz.tab-pane.fade {:role "tabpanel"}
      [:h3 "Resource graph"]
-     [:div.well [:h2 "TODO"]]]]])
+     [:div.well [:h2 "TODO"]]]
+    [:div#tpl.tab-pane.fade {:role "tabpanel"} tpl]]])
 
 (defn related-resource-table
   [prefixes id shared-pred shared-obj]

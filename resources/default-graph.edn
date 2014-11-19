@@ -1,13 +1,13 @@
 [[["http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-    "http://www.w3.org/2000/01/rdf-schema#"
-    "http://www.w3.org/2002/07/owl#"
-    "http://purl.org/dc/terms/"
-    "http://purl.org/dc/dcmitype/"
-    "http://xmlns.com/foaf/0.1/"
-    "http://www.w3.org/2004/02/skos/core#"
-    "http://schema.org/"
-    "http://vocab.deri.ie/void"
-    "http://thi.ng/owl/edit-any/"]
+   "http://www.w3.org/2000/01/rdf-schema#"
+   "http://www.w3.org/2002/07/owl#"
+   "http://purl.org/dc/terms/"
+   "http://purl.org/dc/dcmitype/"
+   "http://xmlns.com/foaf/0.1/"
+   "http://www.w3.org/2004/02/skos/core#"
+   "http://schema.org/"
+   "http://vocab.deri.ie/void"
+   "http://thi.ng/owl/edit-any/"]
   "rdf:type" "owl:Ontology"]
  {"rdf"    {"rdf:type" "rdf:Description"
             "rdf:about" "http://www.w3.org/1999/02/22-rdf-syntax-ns#"}
@@ -48,7 +48,9 @@ sioc:topic=topics:wiki
 sioc:topic=topics:faceted-nav
 ```"
    "dcterms:format" "text/x-markdown"
-   "dcterms:creator" "EA"}
+   "dcterms:creator" "EA"
+   "rdfs:label" "EA Index"
+   "rdf:type" "schema:Article"}
 
   ;; system user
 
@@ -57,4 +59,39 @@ sioc:topic=topics:faceted-nav
         "rdf:type" "foaf:Agent"
         "foaf:homepage" "https://github.com/postspectacular/edit-any"}
 
-  "dcterms:creator" {"rdfs:label" "created by"}}]
+  "dcterms:creator" {"rdfs:label" "created by"}
+
+  "schema:Article" {"ea:hasTemplate" "article-template"}
+  "ea:Template" {"ea:hasTemplate" "template-template"}
+
+  "article-template" {"rdf:type" "ea:Template"
+                      "ea:query"
+                      "{:main
+                        {:select :*
+                         :query [{:where [[?this \"rdfs:label\" ?title]
+                                          [?this \"dcterms:description\" ?body]]}]}}"
+                      "ea:instanceView"
+                      "[[:div
+                         [:h1 \"Title: \" ?main:title]
+                         [:h3 \"Body\"]
+                         ?main:body]]"}
+
+  "template-template" {"rdf:type" "ea:Template"
+                       "ea:query"
+                       "{:main
+                        {:select :*
+                         :query [{:where [[?this \"ea:query\" ?q]
+                                          [?this \"ea:instanceView\" ?tpl]]}]}}"
+                       "ea:instanceView"
+                       "[[:div
+                         [:h3 \"Query:\"] [:textarea.form-control {:name \"attribs[ea:query]\" :rows 10} ?main:q]
+                         [:h3 \"Template\"] [:textarea.form-control {:name \"attribs[ea:instanceView]\" :rows 10} ?main:tpl]]]"}
+
+  "new-vocab-attribs"
+  {"rdf:type" "ea:AttributeCollection"
+   "dcterms:description"
+   "rdf:type=rdf:Description\nrdf:about=<<uri>>"}
+  "article-attribs"
+  {"rdf:type" "ea:AttributeCollection"
+   "dcterms:description"
+   "rdf:type=schema:Article"}}]
