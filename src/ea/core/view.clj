@@ -8,22 +8,35 @@
    [hiccup.form :as form]
    [markdown.core :as md]))
 
+;; pname? (re-seq #"^([a-zA-Z0-9]+:[a-zA-Z0-9]+)" id)
+
+(defn truncate
+  [limit s]
+  (if (and limit (> (count s) limit))
+    (str (subs s 0 limit) "\u2026")
+    s))
+
+(defn fmt-pname
+  [[p n]] (str p ":" n))
+
 (defn resource-link
   [prefixes id label & [trunc]]
   (let [id (if (keyword? id) (name id) (str id))
         uri? (re-seq #"^(https?|mailto|ftp)://" id)
-        pname? (re-seq #"^([a-zA-Z0-9]+:[a-zA-Z0-9]+)" id)
-        res-uri (str "/resources/" id)
-        exp-uri (if pname? (vu/expand-prefixes prefixes id) id)
-        label (or label (if uri? (subs id (count (ffirst uri?))) id))
-        label (if (and trunc (> (count label) trunc))
-                (str (subs label 0 trunc) "\u2026")
-                label)]
-    (list
-     [:a {:href res-uri :title res-uri} label] " "
-     (if (or uri? pname?)
-       [:a {:href exp-uri :title exp-uri}
-        [:span.glyphicon.glyphicon-new-window]]))))
+        pname (if-let [pn (vu/find-prefix prefixes id)]
+                (fmt-pname pn))
+        res-uri (str "/resources/" (or pname id))
+        label (or label
+                  (if uri?
+                    (or pname (subs id (count (ffirst uri?))))
+                    (truncate trunc id)))]
+    (if uri?
+      (list
+       [:a {:href res-uri :title res-uri} (truncate trunc label)] " "
+       (if (or uri? pname)
+         [:a {:href id :title id}
+          [:span.glyphicon.glyphicon-new-window]]))
+      label)))
 
 (defn html-template
   [& body]

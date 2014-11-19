@@ -9,3 +9,7 @@
 a.delete {
   color: red;
 }
+
+textarea {
+    font-family: monospace !important;
+}

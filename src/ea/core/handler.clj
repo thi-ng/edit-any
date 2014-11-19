@@ -8,6 +8,7 @@
    [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
+   [thi.ng.trio.vocabs.utils :as vu]
    [clojure.edn :as edn]
    [clojure.data.json :as json]
    [clojure.java.io :as io]
@@ -24,27 +25,34 @@
   (ref {}))
 
 (defn build-prefixes
-  [graph]
+  [{:strs [ea owl rdf]} graph]
   (->> (q/query
         {:select :*
          :from graph
-         :query [{:where [['?p "rdf:type" "rdf:Description"]
-                          ['?p "rdf:about" '?uri]
-                          ['?uri "rdf:type" "owl:Ontology"]]}]})
-       (reduce (fn [acc {:syms [?p ?uri]}] (assoc acc ?p ?uri)) {})))
+         :query [{:where [['?vocab (str rdf "type") (str rdf "Description")]
+                          ['?vocab (str rdf "about") '?uri]
+                          ['?vocab (str ea "prefix") '?prefix]
+                          ['?uri (str rdf "type") (str owl "Ontology")]]}]})
+       (reduce (fn [acc {:syms [?prefix ?uri]}] (assoc acc ?prefix ?uri)) {})))
 
 (defn start!
   []
-  (let [graph (try
-                (->> "graph.edn" slurp edn/read-string trio/as-model)
-                (catch Exception e
-                  (->> "default-graph.edn" io/resource slurp edn/read-string trio/as-model)))]
-    (dosync
-     (alter
-      state
-      (constantly
-       {:prefixes (build-prefixes graph)
-        :graph    graph})))))
+  (try
+    (let [graph    (->> "graph.edn" slurp edn/read-string trio/as-model)
+          prefixes (build-prefixes
+                    {"ea"  "http://thi.ng/owl/edit-any/"
+                     "owl" "http://www.w3.org/2002/07/owl#"
+                     "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#"}
+                    graph)]
+      (dosync (alter state (constantly {:prefixes prefixes :graph graph}))))
+    (catch Exception e
+      (let [{:keys [prefixes triples]}
+            (->> "default-graph.edn"
+                 io/resource
+                 vu/load-vocab-triples)]
+        (dosync (alter state (constantly {:prefixes prefixes :graph (trio/as-model triples)})))))))
+
+(start!)
 
 (defn format-date
   [dt] (tf/unparse (tf/formatters :mysql) dt))
@@ -84,27 +92,28 @@
           (fn [acc [k v]] (update-in acc [k] (fnil conj []) v)) {}))))
 
 (defn attrib-templates
-  [graph]
+  [{:strs [ea dcterms rdf]} graph]
   (q/query
    {:select [{:id '?id} {:tpl '?tpl}]
     :from graph
-    :query [{:where '[[?id "rdf:type" "ea:AttributeCollection"]
-                      [?id "dcterms:description" ?tpl]]}]}))
+    :query [{:where '[[?id (str rdf "type") (str ea "AttributeCollection")]
+                      [?id (str dcterms "description") ?tpl]]}]}))
 (defn new-resource?
   [id] (nil? (seq (trio/select (:graph @state) (maybe-number id) nil nil))))
 
 (defn handle-resource-update
   [ctx]
   (let [{:keys [id body title attribs new-attribs replace]} (get-in ctx [:request :params])
+        {{:strs [dcterms rdfs]} :prefixes graph :graph} @state
         now (t/now)
         fnow (format-date now)
-        triples (cond-> [[id "dcterms:modified" fnow]]
-                        (new-resource? id) (conj [id "dcterms:created" fnow])
-                        body               (conj [id "dcterms:description" body])
-                        title              (conj [id "rdfs:label" title]))
-        remove-props (cond-> #{"dcterms:modified"}
-                             body  (conj "dcterms:description")
-                             title (conj "rdfs:label"))
+        triples (cond-> [[id (str dcterms "modified") fnow]]
+                        (new-resource? id) (conj [id (str dcterms "created") fnow])
+                        body               (conj [id (str dcterms "description") body])
+                        title              (conj [id (str rdfs "label") title]))
+        remove-props (cond-> #{(str dcterms "modified")}
+                             body  (conj (str dcterms "description"))
+                             title (conj (str rdfs "label")))
         attribs (merge (parse-attribs new-attribs) attribs)
         _ (info :post-attribs attribs)
         triples (->> attribs
@@ -114,7 +123,7 @@
     (prn :new-attribs attribs)
     (dosync
      (alter state
-            (fn [{:keys [graph] :as state}]
+            (fn [{:keys [prefixes graph] :as state}]
               (let [old (q/query
                          {:construct '[[?s ?p ?o]]
                           :from graph
@@ -127,7 +136,7 @@
                 ;;(prn :new triples)
                 (assoc state
                   :graph graph
-                  :prefixes (build-prefixes graph))))))
+                  :prefixes (build-prefixes prefixes graph))))))
     (spit "graph.edn" (sort (trio/select (:graph @state))))
     {::id id}))
 
@@ -139,10 +148,23 @@
     :query [{:where '[[?s ?p ?o]]}]
     :values {'?s #{id}}}))
 
+(defn inject-var
+  [res x]
+  (if (q/qvar? x)
+    (let [[[_ k v]] (re-seq #"\?(\w+):(\w+)" (name x))]
+      (get-in res [(keyword k) (symbol (str "?" v))]))
+    x))
+
+(defn expand-pnames-in-query
+  [prefixes x]
+  (if (string? x) (vu/expand-pname prefixes x) x))
+
 (defn populate-template
-  [graph this {:syms [?q ?tpl] :as spec}]
+  [prefixes graph this {:syms [?q ?tpl] :as spec}]
   (info :template-spec spec)
   (let [qspecs (read-string ?q)
+        qspecs (postwalk #(expand-pnames-in-query prefixes %) qspecs)
+        _ (info :expanded qspecs)
         qres   (reduce-kv
                 (fn [acc k spec]
                   (let [spec (assoc spec :from graph :values {'?this #{this}})
@@ -152,25 +174,19 @@
     (info :tpl-res qres)
     (->> ?tpl
          read-string
-         (postwalk
-          (fn [x]
-            (if (q/qvar? x)
-              (let [[[_ k v]] (re-seq #"\?(\w+):(\w+)" (name x))]
-                (get-in qres [(keyword k) (symbol (str "?" v))]))
-              x)))
-         seq
-         ((fn [t] (info :tpl t) t)))))
+         (postwalk #(inject-var qres %))
+         seq)))
 
 (defn build-resource-template
-  [graph id]
+  [{:strs [ea rdf] :as prefixes} graph id]
   (->> {:select :*
         :from graph
-        :query [{:where [[id "rdf:type" '?type]
-                         ['?type "ea:hasTemplate" '?tpl-id]
-                         ['?tpl-id "ea:query" '?q]
-                         ['?tpl-id "ea:instanceView" '?tpl]]}]}
+        :query [{:where [[id (str rdf "type") '?type]
+                         ['?type (str ea "hasTemplate") '?tpl-id]
+                         ['?tpl-id (str ea "query") '?q]
+                         ['?tpl-id (str ea "instanceView") '?tpl]]}]}
        q/query
-       (map #(populate-template graph id %))))
+       (map #(populate-template prefixes graph id %))))
 
 (defmulti handle-resource-get #(-> % :representation :media-type))
 
@@ -189,36 +205,45 @@
 (defmethod handle-resource-get "text/html"
   [ctx]
   (let [{:keys [prefixes graph]} @state
-        id (maybe-number (-> ctx :request :params :id))
+        {:strs [dcterms rdfs this]} prefixes
+        _ (info :prefixes prefixes)
+        _ (info :dcterms dcterms)
+        _ (info :rdfs rdfs)
+        _ (info :this this)
+        id (-> ctx :request :params :id)
+        _ (info :id1 (vu/expand-pname prefixes id))
+        id (if-let [uri (vu/expand-pname prefixes id)] uri (str this id))
+        _ (info :id id (-> ctx :request :uri))
+        id (maybe-number id)
         {:syms [?body ?title] :as res}
         (first
          (q/query
           {:select :*
            :from graph
-           :query [{:where [[id "dcterms:description" '?body]]}
-                   {:union [[id "rdfs:label" '?title]]}]}))
-        template (build-resource-template graph id)
+           :query [{:where [[id (str dcterms "description") '?body]]}
+                   {:union [[id (str rdfs "label") '?title]]}]}))
+        template (build-resource-template prefixes graph id)
         attribs (q/query
                  {:select :*
                   :from graph
                   :query [{:where [[id '?att '?val]]
-                           :filter {'?att #(not (#{"dcterms:description" "rdfs:label"} %))}}
-                          {:optional [['?att "rdfs:label" '?atitle]]}
-                          {:optional [['?val "rdfs:label" '?vtitle]]}]
+                           :filter {'?att #(not (#{(str dcterms "description") (str rdfs "label")} %))}}
+                          {:optional [['?att (str rdfs "label") '?atitle]]}
+                          {:optional [['?val (str rdfs "label") '?vtitle]]}]
                   :group '?att})
         shared-pred (q/query
                      {:select :*
                       :from graph
                       :query [{:where [['?other id '?val]]}
-                              {:optional [['?other "rdfs:label" '?otitle]]}
-                              {:optional [['?val "rdfs:label" '?vtitle]]}]
+                              {:optional [['?other (str rdfs "label") '?otitle]]}
+                              {:optional [['?val (str rdfs "label") '?vtitle]]}]
                       :order-asc '[?other ?val]})
         shared-obj (q/query
                     {:select :*
                      :from graph
                      :query [{:where [['?other '?pred id]]}
-                             {:optional [['?other "rdfs:label" '?otitle]]}
-                             {:optional [['?pred "rdfs:label" '?ptitle]]}]
+                             {:optional [['?other (str rdfs "label") '?otitle]]}
+                             {:optional [['?pred (str rdfs "label") '?ptitle]]}]
                      :order-asc '[?other ?pred]})]
     ;;(info id :title ?title)
     ;;(info id :attribs attribs)
@@ -233,7 +258,7 @@
         (view/content-tab-panels ?body template)
         (when (or (seq shared-pred) (seq shared-obj))
           (view/related-resource-table prefixes (or ?title id) shared-pred shared-obj))]
-       (view/attrib-sidebar prefixes graph attribs (attrib-templates graph))]])))
+       (view/attrib-sidebar prefixes graph attribs (attrib-templates prefixes graph))]])))
 
 (defresource resource [id]
   :available-media-types ["text/html" "application/edn" "application/json"]
@@ -243,11 +268,9 @@
   :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
 
 (defroutes app-routes
-  (GET "/" [] (resp/redirect "/resources/Index"))
+  (GET "/" [] (resp/redirect (str "/resources/this:Index")))
   (ANY ["/resources/:id" :id #".*"] [id] (resource id)))
 
 (def app
   (->> (assoc-in site-defaults [:security :anti-forgery] false)
        (wrap-defaults app-routes)))
-
-(start!)
