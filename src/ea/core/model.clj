@@ -28,7 +28,7 @@
 (def state (ref {}))
 
 (defn build-prefixes
-  [{:strs [ea owl rdf]} graph]
+  [graph]
   (->> (q/query
         {:select :*
          :from   graph
@@ -42,7 +42,7 @@
   []
   (try
     (let [graph    (->> "graph.edn" slurp edn/read-string trio/as-model)
-          prefixes (build-prefixes default-prefixes graph)]
+          prefixes (build-prefixes graph)]
       (dosync (alter state (constantly {:prefixes prefixes :graph graph}))))
     (catch Exception e
       (let [{:keys [prefixes triples]}

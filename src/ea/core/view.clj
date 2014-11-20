@@ -66,6 +66,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
    [:div.attribs
     (map
      (fn [[attr vals]]
+       (prn :attr (first vals))
        (list
         [:h5.attrib (resource-link prefixes attr ((first vals) '?atitle) 30)]
         (el/unordered-list

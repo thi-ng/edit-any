@@ -19,7 +19,7 @@
    [clj-time.core :as t]
    [taoensso.timbre :refer [info warn error]]))
 
-;; (taoensso.timbre/set-config! [:ns-blacklist] ['thi.ng.trio.query])
+(taoensso.timbre/set-config! [:ns-blacklist] ['thi.ng.trio.query])
 
 ;; (taoensso.timbre/set-config! [:ns-blacklist] [])
 
@@ -94,10 +94,12 @@
             (fn [{:keys [prefixes graph] :as state}]
               (let [graph (-> graph
                               (trio/remove-triples src-triples)
-                              (trio/add-triples triples))]
+                              (trio/add-triples triples))
+                    prefixes (model/build-prefixes graph)]
+                (prn :new-prefixes prefixes)
                 (assoc state
-                  :graph graph
-                  :prefixes (model/build-prefixes prefixes graph))))))
+                  :prefixes prefixes
+                  :graph graph)))))
     (spit "graph.edn" (sort (trio/select (:graph @state))))
     {::id id}))
 
@@ -118,21 +120,23 @@
 (defmethod handle-resource-get "text/html"
   [ctx]
   (let [{:keys [prefixes graph]} @state
-        {:strs [dcterms rdfs _]} prefixes
         id (-> ctx :request :params :id)
         __ (info :id1 (vu/expand-pname prefixes id))
-        id (if-let [uri (vu/expand-pname prefixes id)] uri (str _ id))
+        id (if-let [uri (vu/expand-pname prefixes id)] uri (str (prefixes "_") id))
         __ (info :id id (-> ctx :request :uri))
         {:syms [?body ?title] :as res} (model/get-resource-description graph id)
         ?title (or ?title
                    (if-let [pn (vu/find-prefix prefixes id)]
                      (if (= "_" (pn 0)) (if (seq (pn 1)) (pn 1)) (view/fmt-pname pn))))
         template (tpl/build-resource-template prefixes graph id)
+        attr-tpls (model/get-attrib-templates prefixes graph)
         attribs (model/get-other-resource-attribs graph id)
         shared-pred (model/get-shared-predicate graph id)
         shared-obj (model/get-shared-object graph id)]
     ;;(info id :title ?title)
-    ;;(info id :attribs attribs)
+    (info :prefixes prefixes)
+    (info id :attribs)
+    (pprint attribs)
     ;;(info id :shared-p shared-pred)
     ;;(info id :shared-o shared-obj)
     (view/html-template
@@ -144,7 +148,7 @@
         (view/content-tab-panels ?body template)
         (when (or (seq shared-pred) (seq shared-obj))
           (view/related-resource-table prefixes (or ?title id) shared-pred shared-obj))]
-       (view/attrib-sidebar prefixes graph attribs (model/get-attrib-templates prefixes graph))]])))
+       (view/attrib-sidebar prefixes graph attribs attr-tpls)]])))
 
 (defresource resource [id]
   :available-media-types ["text/html" "application/edn" "application/json"]
