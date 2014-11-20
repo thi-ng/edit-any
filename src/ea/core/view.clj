@@ -6,7 +6,9 @@
    [hiccup.page :refer [html5 include-js include-css]]
    [hiccup.element :as el]
    [hiccup.form :as form]
-   [markdown.core :as md]))
+   [markdown.core :as md]
+   [clj-time.core :as t]
+   [clj-time.format :as tf]))
 
 ;; pname? (re-seq #"^([a-zA-Z0-9]+:[a-zA-Z0-9]+)" id)
 
@@ -16,20 +18,25 @@
     (str (subs s 0 limit) "\u2026")
     s))
 
+(defn format-date
+  [dt] (tf/unparse (tf/formatters :mysql) dt))
+
 (defn fmt-pname
   [[p n]] (str p ":" n))
 
 (defn resource-link
   [prefixes id label & [trunc]]
   (let [id (if (keyword? id) (name id) (str id))
+        id (or (vu/expand-pname prefixes id) id)
         uri? (re-seq #"^(https?|mailto|ftp)://" id)
         pname (if-let [pn (vu/find-prefix prefixes id)]
-                (if (= "this" (pn 0)) (pn 1) (fmt-pname pn)))
+                (if (= "_" (pn 0)) (if (seq (pn 1)) (pn 1)) (fmt-pname pn)))
         res-uri (str "/resources/" (or pname id))
         label (or label
                   (if uri?
                     (or pname (subs id (count (ffirst uri?))))
                     (truncate trunc id)))]
+    (prn :reslink id uri? pname res-uri label)
     (if uri?
       (list
        [:a {:href res-uri :title res-uri} (truncate trunc label)] " "
@@ -70,7 +77,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
           vals))))
      (sort-by key attribs))]
    [:h4 "Add attributes"]
-   [:div.form-group [:textarea#new-attribs.form-control {:name "new-attribs"}]]
+   [:div.form-group [:textarea#new-attribs.form-control {:name "new-attribs" :rows 5}]]
    [:select#attr-templates.form-control (map (fn [{:keys [id tpl]}] [:option {:label id :value tpl}]) (cons {:id "Choose template..":value ""} templates))]
    [:div.checkbox [:label [:input {:type "checkbox" :name "replace"}] " Replace existing"]]
    [:div.form-group [:button.btn.btn-primary {:type "submit"} "Submit"]]])
@@ -97,6 +104,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
 
 (defn related-resource-table
   [prefixes id shared-pred shared-obj]
+  (prn :table-id id)
   (list
    [:h3 "Related resources "
     [:span.label.label-default (+ (count shared-pred) (count shared-obj))]]

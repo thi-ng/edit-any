@@ -11,7 +11,7 @@
                  [clj-time "0.8.0"]
                  [clj-jgit "0.8.2"]
                  [hiccup "1.0.5"]
-                 [markdown-clj "0.9.57" :exclusions [org.clojure/clojure]]]
+                 [org.clojars.toxi/markdown-clj "0.9.57" :exclusions [org.clojure/clojure]]]
   :plugins [[lein-ring "0.8.13"]]
   :ring {:handler ea.core.handler/app}
   :profiles

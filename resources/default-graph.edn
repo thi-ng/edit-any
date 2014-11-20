@@ -8,58 +8,49 @@
   "skos"    "http://www.w3.org/2004/02/skos/core#"
   "schema"  "http://schema.org/"
   "void"    "http://vocab.deri.ie/void"
-  "ea"      "http://thi.ng/owl/edit-any/"
-  "this"    "http://localhost:3000/resources/"}
+  "ea"      "http://thi.ng/owl/edit-any#"
+  "_"       "http://localhost:3000/resources/"}
  :triples
- [[["http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-    "http://www.w3.org/2000/01/rdf-schema#"
-    "http://www.w3.org/2002/07/owl#"
-    "http://purl.org/dc/terms/"
-    "http://purl.org/dc/dcmitype/"
-    "http://xmlns.com/foaf/0.1/"
-    "http://www.w3.org/2004/02/skos/core#"
-    "http://schema.org/"
-    "http://vocab.deri.ie/void"
-    "http://thi.ng/owl/edit-any/"]
+ [[["rdf:" "rdfs:" "owl:" "dcterms:" "dctypes:" "foaf:" "skos:" "schema:" "void:" "_:"]
    "rdf:type" "owl:Ontology"]
 
-  {"this:rdf"     {"rdf:type" "rdf:Description"
-                   "rdf:about" "rdf:"
-                   "ea:prefix" "rdf"}
-   "this:rdfs"    {"rdf:type" "rdf:Description"
-                   "rdf:about" "rdfs"
-                   "ea:prefix" "rdfs"}
-   "this:owl"     {"rdf:type" "rdf:Description"
-                   "rdf:about" "owl:"
-                   "ea:prefix" "owl"}
-   "this:dcterms" {"rdf:type" "rdf:Description"
-                   "rdf:about" "dcterms:"
-                   "ea:prefix" "dcterms"}
-   "this:dctypes" {"rdf:type" "rdf:Description"
-                   "rdf:about" "dctypes:"
-                   "ea:prefix" "dctypes"}
-   "this:foaf"    {"rdf:type" "rdf:Description"
-                   "rdf:about" "foaf:"
-                   "ea:prefix" "foaf"}
-   "this:skos"    {"rdf:type" "rdf:Description"
-                   "rdf:about" "skos:"
-                   "ea:prefix" "skos"}
-   "this:schema"  {"rdf:type" "rdf:Description"
-                   "rdf:about" "schema:"
-                   "ea:prefix" "schema"}
-   "this:void"    {"rdf:type" "rdf:Description"
-                   "rdf:about" "void:"
-                   "ea:prefix" "void"}
-   "this:ea"      {"rdf:type" "rdf:Description"
-                   "rdf:about" "ea:"
-                   "ea:prefix" "ea"}
-   "this:this"    {"rdf:type" "rdf:Description"
-                   "rdf:about" "this:"
-                   "ea:prefix" "this"}
+  {"_:rdf"     {"rdf:type" "rdf:Description"
+                "rdf:about" "rdf:"
+                "ea:prefix" "rdf"}
+   "_:rdfs"    {"rdf:type" "rdf:Description"
+                "rdf:about" "rdfs"
+                "ea:prefix" "rdfs"}
+   "_:owl"     {"rdf:type" "rdf:Description"
+                "rdf:about" "owl:"
+                "ea:prefix" "owl"}
+   "_:dcterms" {"rdf:type" "rdf:Description"
+                "rdf:about" "dcterms:"
+                "ea:prefix" "dcterms"}
+   "_:dctypes" {"rdf:type" "rdf:Description"
+                "rdf:about" "dctypes:"
+                "ea:prefix" "dctypes"}
+   "_:foaf"    {"rdf:type" "rdf:Description"
+                "rdf:about" "foaf:"
+                "ea:prefix" "foaf"}
+   "_:skos"    {"rdf:type" "rdf:Description"
+                "rdf:about" "skos:"
+                "ea:prefix" "skos"}
+   "_:schema"  {"rdf:type" "rdf:Description"
+                "rdf:about" "schema:"
+                "ea:prefix" "schema"}
+   "_:void"    {"rdf:type" "rdf:Description"
+                "rdf:about" "void:"
+                "ea:prefix" "void"}
+   "_:ea"      {"rdf:type" "rdf:Description"
+                "rdf:about" "ea:"
+                "ea:prefix" "ea"}
+   "_:this"    {"rdf:type" "rdf:Description"
+                "rdf:about" "_:"
+                "ea:prefix" "_"}
 
    ;; default page
 
-   "this:Index"
+   "_:Index"
    {"dcterms:description"
     "# Welcome to EditAnything
 
@@ -70,49 +61,58 @@ Use the Edit tab to change this content (using [GitHub flavored Markdown](https:
 Use the textbox in the sidebar to add more attributes to describe & link this resource:
 
 ```
-dcterms:contributor=this:Toxi
+dcterms:contributor=_:Toxi
 sioc:topic=topics:wiki
 sioc:topic=topics:faceted-nav
+```
+
+```clojure
+(defresource resource [id]
+  :available-media-types [\"text/html\" \"application/edn\" \"application/json\"]
+  :allowed-methods [:get :post]
+  :handle-ok handle-resource-get
+  :post! handle-resource-update
+  :post-redirect? (fn [ctx] {:location (str \"/resources/\" (::id ctx))}))
 ```"
     "dcterms:format" "text/x-markdown"
-    "dcterms:creator" "this:EA"
+    "dcterms:creator" "_:EA"
     "rdfs:label" "EA Index"
     "rdf:type" "schema:Article"}
 
    ;; system user
 
-   "this:EA" {"dcterms:description" "This is the EditAnything system user"
-              "rdfs:label" "EditAnything"
-              "rdf:type" "foaf:Agent"
-              "foaf:homepage" "https://github.com/postspectacular/edit-any"}
+   "_:EA" {"dcterms:description" "This is the EditAnything system user"
+           "rdfs:label" "EditAnything"
+           "rdf:type" "foaf:Agent"
+           "foaf:homepage" "https://github.com/postspectacular/edit-any"}
 
    "dcterms:creator" {"rdfs:label" "created by"}
 
-   "schema:Article" {"ea:hasTemplate" "this:ArticleTemplate"}
-   "ea:Template" {"ea:hasTemplate" "this:TemplateTemplate"}
+   "schema:Article" {"ea:hasTemplate" "_:ArticleTemplate"}
+   "ea:Template" {"ea:hasTemplate" "_:TemplateTemplate"}
 
-   "this:ArticleTemplate"
+   "_:ArticleTemplate"
    {"rdf:type" "ea:Template"
     "ea:query"
     "{:main
      {:select :* :query [{:where [[?this \"rdfs:label\" ?title] [?this \"dcterms:description\" ?body]]}]}}"
     "ea:instanceView"
-    "[[:div [:h1 \"Title: \" ?main:title] [:h3 \"Body\"] ?main:body]]"}
+    "[:div [:h1 \"Title: \" ?main:title] [:h3 \"Body\"] ?main:body]"}
 
-   "this:TemplateTemplate"
+   "_:TemplateTemplate"
    {"rdf:type" "ea:Template"
     "ea:query"
     "{:main {:select :* :query [{:where [[?this \"ea:query\" ?q] [?this \"ea:instanceView\" ?tpl]]}]}}"
     "ea:instanceView"
     "[:div
- [:h3 \"Query:\"] [:textarea.form-control {:name \"attribs[ea:query]\" :rows 10} ?main:q]
+ [:h3 \"Query\"] [:textarea.form-control {:name \"attribs[ea:query]\" :rows 10} ?main:q]
  [:h3 \"Template\"] [:textarea.form-control {:name \"attribs[ea:instanceView]\" :rows 10} ?main:tpl]]"}
 
-   "this:NewVocabAttribs"
+   "_:NewVocabAttribs"
    {"rdf:type" "ea:AttributeCollection"
     "dcterms:description"
     "rdf:type=rdf:Description\nrdf:about=<<uri>>\nea:prefix=<<prefix>>"}
-   "this:ArticleAttribs"
+   "_:ArticleAttribs"
    {"rdf:type" "ea:AttributeCollection"
     "dcterms:description"
     "rdf:type=schema:Article"}}]}
