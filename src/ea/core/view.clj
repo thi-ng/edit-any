@@ -42,12 +42,13 @@
   [& body]
   (html5
    [:head
-    (apply include-css ["/css/bootstrap.min.css" "/css/main.css"])
-    (apply include-js ["/js/jquery-2.1.1.min.js" "/js/bootstrap.min.js" "/js/marked.min.js"])]
+    (apply include-css ["/css/bootstrap.min.css" "/css/main.css" "/highlight/styles/solarized_light.css"])
+    (apply include-js ["/js/jquery-2.1.1.min.js" "/js/bootstrap.min.js" "/js/marked.min.js" "/highlight/highlight.pack.js"])]
    [:body
     [:div.container-fluid body]
     (el/javascript-tag
-     "$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));});
+     "hljs.initHighlightingOnLoad();
+$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));});
 $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-attribs\").val(e.target.value);});")]))
 
 (defn attrib-sidebar
