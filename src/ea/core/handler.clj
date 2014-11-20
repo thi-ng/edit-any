@@ -11,9 +11,11 @@
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
    [thi.ng.trio.vocabs.utils :as vu]
+   [thi.ng.trio.vocabs.dcterms :refer [dcterms]]
    [clojure.edn :as edn]
    [clojure.data.json :as json]
    [clojure.string :as str]
+   [clojure.pprint :refer [pprint]]
    [clj-time.core :as t]
    [taoensso.timbre :refer [info warn error]]))
 
@@ -41,53 +43,63 @@
           #(let [s (.indexOf % "=")]
              (if (>= s 0)
                (let [pname (subs % 0 s)
-                     uri (vu/expand-pname prefixes pname)]
-                 (if uri
-                   [uri (subs % (inc s))]
-                   (warn "unknown prefix in pname:" pname))))))
+                     oname (subs % (inc s))
+                     puri (vu/expand-pname prefixes pname)
+                     ouri (vu/expand-pname prefixes oname)]
+                 (if puri
+                   [puri (or ouri oname)]
+                   (warn "skipping unknown prefix in pname:" pname))))))
          (filter identity)
          (reduce
           (fn [acc [k v]] (update-in acc [k] (fnil conj []) v)) {}))))
 
 (defn handle-resource-update
   [ctx]
-  (let [{:keys [id body title attribs bulk-attribs replace]} (get-in ctx [:request :params])
-        {{:strs [dcterms rdfs]} :prefixes graph :graph} @state
+  (info :post (get-in ctx [:request :params]))
+  (let [{:keys [id attribs bulk-attribs replace]} (get-in ctx [:request :params])
+        {:keys [prefixes graph]} @state
         now (t/now)
         fnow (view/format-date now)
-        triples (cond-> [[id (str dcterms "modified") fnow]]
-                        (model/new-resource? id) (conj [id (str dcterms "created") fnow])
-                        body                     (conj [id (str dcterms "description") body])
-                        title                    (conj [id (str rdfs "label") title]))
-        remove-props (cond-> #{(str dcterms "modified")}
-                             body  (conj (str dcterms "description"))
-                             title (conj (str rdfs "label")))
-        attribs (merge (parse-attribs bulk-attribs) attribs)
-        _ (info :post-attribs attribs)
-        triples (->> attribs
-                     (map (fn [[p o]] [id (name p) o]))
-                     (concat triples)
-                     (trio/triple-seq))]
-    (prn :triples triples)
+        attribs (reduce-kv
+                 (fn [acc k v]
+                   (if-let [uri (vu/expand-pname prefixes k)]
+                     (assoc acc uri v)
+                     acc))
+                 {} attribs)
+        attribs (if (model/new-resource? id)
+                  (assoc attribs (:created dcterms) fnow)
+                  (assoc attribs (:modified dcterms) fnow))
+        attribs (merge attribs (parse-attribs bulk-attribs))
+        src-triples (set (trio/select graph id nil nil))
+        new-triples (->> attribs (map (fn [[p o]] (trio/triple id (name p) o))) (trio/triple-seq))
+        triples (reduce
+                 (fn [acc t]
+                   (let [p (nth t 1)]
+                     (info :triple t :p p)
+                     (if-let [del (seq (filter #(and (not= t %) (= p (:p %))) acc))]
+                       (let [acc (apply disj acc del)]
+                         (info :delete del)
+                         (if-not (empty? (last t)) (conj acc t) acc))
+                       (if-not (empty? (last t)) (conj acc t) acc))))
+                 src-triples
+                 new-triples)]
+    (info :src)
+    (pprint src-triples)
+    (info :new)
+    (pprint new-triples)
+    (info :updated)
+    (pprint triples)
     (dosync
      (alter state
             (fn [{:keys [prefixes graph] :as state}]
-              (let [old (q/query
-                         {:construct '[[?s ?p ?o]]
-                          :from graph
-                          :query [{:where [['?s '?p '?o]]}]
-                          :values {'?s #{id} '?p remove-props}})
-                    graph (-> graph
-                              (trio/remove-triples old)
+              (let [graph (-> graph
+                              (trio/remove-triples src-triples)
                               (trio/add-triples triples))]
-                ;;(prn :old old)
-                ;;(prn :new triples)
                 (assoc state
                   :graph graph
                   :prefixes (model/build-prefixes prefixes graph))))))
     (spit "graph.edn" (sort (trio/select (:graph @state))))
     {::id id}))
-
 
 (defmulti handle-resource-get #(-> % :representation :media-type))
 

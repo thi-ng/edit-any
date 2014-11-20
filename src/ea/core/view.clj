@@ -77,7 +77,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
           vals))))
      (sort-by key attribs))]
    [:h4 "Add attributes"]
-   [:div.form-group [:textarea#new-attribs.form-control {:name "new-attribs" :rows 5}]]
+   [:div.form-group [:textarea#new-attribs.form-control {:name "bulk-attribs" :rows 5}]]
    [:select#attr-templates.form-control (map (fn [{:keys [id tpl]}] [:option {:label id :value tpl}]) (cons {:id "Choose template..":value ""} templates))]
    [:div.checkbox [:label [:input {:type "checkbox" :name "replace"}] " Replace existing"]]
    [:div.form-group [:button.btn.btn-primary {:type "submit"} "Submit"]]])
@@ -95,7 +95,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
      [:div#preview-body (md/md-to-html-string body)]]
     [:div#edit.tab-pane.fade {:role "tabpanel"}
      [:h3 "Edit resource description"]
-     [:p [:textarea#editor.form-control {:name "body" :rows 10} body]]
+     [:p [:textarea#editor.form-control {:name "attribs[dcterms:description]" :rows 10} body]]
      [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]
     [:div#viz.tab-pane.fade {:role "tabpanel"}
      [:h3 "Resource graph"]
