@@ -3,6 +3,7 @@
    [ea.core.model :as model :refer [state]]
    [ea.core.templates :as tpl]
    [ea.core.view :as view]
+   [ea.core.utils :as utils]
    [compojure.core :refer :all]
    [compojure.route :as route]
    [liberator.core :as lib :refer [defresource]]
@@ -51,38 +52,54 @@
                    (warn "skipping unknown prefix in pname:" pname))))))
          (filter identity)
          (reduce
-          (fn [acc [k v]] (update-in acc [k] (fnil conj []) v)) {}))))
+          (fn [acc [k v]]
+            (update-in acc [k] (fnil conj []) v))
+          {}))))
+
+(defn replace-triples
+  [src new]
+  (reduce
+   (fn [acc t]
+     (let [p (nth t 1)]
+       (info :triple t :p p)
+       (if-let [del (->> src
+                         (filter #(and (not= t %) (= p (:p %))))
+                         (seq))]
+         (let [acc (apply disj acc del)]
+           (info :delete del)
+           (if-not (empty? (last t)) (conj acc t) acc))
+         (if-not (empty? (last t)) (conj acc t) acc))))
+   (set src) new))
 
 (defn handle-resource-update
   [ctx]
   (info :post (get-in ctx [:request :params]))
   (let [{:keys [id attribs bulk-attribs replace]} (get-in ctx [:request :params])
         {:keys [prefixes graph]} @state
+        res (if-let [uri (vu/expand-pname prefixes id)] uri (str (prefixes "this") id))
         now (t/now)
-        fnow (view/format-date now)
+        fnow (utils/format-date now)
         attribs (reduce-kv
                  (fn [acc k v]
                    (if-let [uri (vu/expand-pname prefixes k)]
-                     (assoc acc uri v)
+                     (assoc acc uri (mapv utils/line-endings (if (vector? v) v [v])))
                      acc))
                  {} attribs)
-        attribs (if (model/new-resource? id)
-                  (assoc attribs (:created dcterms) fnow)
-                  (assoc attribs (:modified dcterms) fnow))
+        auto-triples (if (model/new-resource? res)
+                       [[res (:created dcterms) fnow]]
+                       [[res (:modified dcterms) fnow]])
         attribs (merge attribs (parse-attribs bulk-attribs))
-        src-triples (set (trio/select graph id nil nil))
-        new-triples (->> attribs (map (fn [[p o]] (trio/triple id (name p) o))) (trio/triple-seq))
-        triples (reduce
-                 (fn [acc t]
-                   (let [p (nth t 1)]
-                     (info :triple t :p p)
-                     (if-let [del (seq (filter #(and (not= t %) (= p (:p %))) acc))]
-                       (let [acc (apply disj acc del)]
-                         (info :delete del)
-                         (if-not (empty? (last t)) (conj acc t) acc))
-                       (if-not (empty? (last t)) (conj acc t) acc))))
-                 src-triples
-                 new-triples)]
+        _ (info :attribs)
+        _ (pprint attribs)
+        src-triples (trio/select graph res nil nil)
+        new-triples (->> attribs
+                         (map (fn [[p o]] [res (name p) o]))
+                         (trio/triple-seq))
+        triples (replace-triples src-triples auto-triples)
+        triples (if replace
+                  (replace-triples triples new-triples)
+                  (->> (into triples new-triples)
+                       (filter #(not (empty? (last %))))))]
     (info :src)
     (pprint src-triples)
     (info :new)
@@ -101,6 +118,7 @@
                   :prefixes prefixes
                   :graph graph)))))
     (spit "graph.edn" (sort (trio/select (:graph @state))))
+    (spit "prefixes.edn" (sort (keys (:prefixes @state))))
     {::id id}))
 
 (defmulti handle-resource-get #(-> % :representation :media-type))
@@ -121,19 +139,21 @@
   [ctx]
   (let [{:keys [prefixes graph]} @state
         id (-> ctx :request :params :id)
-        __ (info :id1 (vu/expand-pname prefixes id))
-        id (if-let [uri (vu/expand-pname prefixes id)] uri (str (prefixes "_") id))
+        __ (info :id (vu/expand-pname prefixes id) id)
+        id (if-let [uri (vu/expand-pname prefixes id)] uri (str (prefixes "this") id))
         __ (info :id id (-> ctx :request :uri))
         {:syms [?body ?title] :as res} (model/get-resource-description graph id)
         ?title (or ?title
                    (if-let [pn (vu/find-prefix prefixes id)]
-                     (if (= "_" (pn 0)) (if (seq (pn 1)) (pn 1)) (view/fmt-pname pn))))
+                     (if (= "this" (pn 0)) (if (seq (pn 1)) (pn 1)) (model/format-pname pn))))
         template (tpl/build-resource-template prefixes graph id)
         attr-tpls (model/get-attrib-templates prefixes graph)
         attribs (model/get-other-resource-attribs graph id)
         shared-pred (model/get-shared-predicate graph id)
-        shared-obj (model/get-shared-object graph id)]
+        shared-obj (model/get-shared-object graph id)
+        res-uri (first (model/resource-uri prefixes id))]
     ;;(info id :title ?title)
+    (info :res-uri res-uri)
     (info :prefixes prefixes)
     (info id :attribs)
     (pprint attribs)
@@ -142,7 +162,7 @@
     (view/html-template
      [:div.row
       [:div.col-xs-12 [:h1 ?title]]]
-     [:form {:method :post :action (str "/resources/" id)}
+     [:form {:method :post :action res-uri}
       [:div.row
        [:div.col-sm-8.col-md-9
         (view/content-tab-panels ?body template)

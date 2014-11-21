@@ -1,6 +1,5 @@
 (ns ea.core.model
   (:require
-   [ea.core.view :as view]
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
    [thi.ng.trio.vocabs :refer [defvocab]]
@@ -25,7 +24,7 @@
   :prefix
   :query)
 
-(def state (ref {}))
+(defonce state (ref {}))
 
 (defn build-prefixes
   [graph]
@@ -49,7 +48,21 @@
             (->> "default-graph.edn"
                  io/resource
                  vu/load-vocab-triples)]
-        (dosync (alter state (constantly {:prefixes prefixes :graph (trio/as-model triples)})))))))
+        (dosync (alter state (constantly {:prefixes prefixes :graph (trio/as-model triples)})))
+        (spit "graph-0.edn" (sort (trio/select (:graph @state))))
+        (spit "prefixes-0.edn" (sort (keys (:prefixes @state))))))))
+
+(defn format-pname
+  [[p n]] (str p ":" n))
+
+(defn resource-uri
+  [prefixes id]
+  (let [uri? (re-seq #"^(https?|mailto|ftp)://" id)
+        pn (vu/find-prefix prefixes id)
+        pname (if pn
+                (format-pname pn))
+        res-uri (if (and pn (= "this" (pn 0))) id (str "/resources/" (or pname id)))]
+    [res-uri pname uri?]))
 
 (defn new-resource?
   [id] (nil? (seq (trio/select (:graph @state) id nil nil))))
@@ -66,7 +79,7 @@
   [prefixes graph]
   (info :get-attrib-templates)
   (q/query
-   {:select [{:id {:use '?id :fn #(view/fmt-pname (vu/find-prefix prefixes %))}}
+   {:select [{:id {:use '?id :fn #(format-pname (vu/find-prefix prefixes %))}}
              {:tpl '?tpl}]
     :from graph
     :query [{:where [['?id (:type rdf) (:AttributeCollection ea)]

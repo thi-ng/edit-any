@@ -1,45 +1,29 @@
 (ns ea.core.view
   (:require
+   [ea.core.model :as model]
+   [ea.core.utils :as utils]
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.vocabs.utils :as vu]
    [clojure.string :as str]
    [hiccup.page :refer [html5 include-js include-css]]
    [hiccup.element :as el]
    [hiccup.form :as form]
-   [markdown.core :as md]
-   [clj-time.core :as t]
-   [clj-time.format :as tf]))
+   [markdown.core :as md]))
 
 ;; pname? (re-seq #"^([a-zA-Z0-9]+:[a-zA-Z0-9]+)" id)
 
-(defn truncate
-  [limit s]
-  (if (and limit (> (count s) limit))
-    (str (subs s 0 limit) "\u2026")
-    s))
-
-(defn format-date
-  [dt] (tf/unparse (tf/formatters :mysql) dt))
-
-(defn fmt-pname
-  [[p n]] (str p ":" n))
-
 (defn resource-link
   [prefixes id label & [trunc]]
-  (let [id (if (keyword? id) (name id) (str id))
-        id (or (vu/expand-pname prefixes id) id)
-        uri? (re-seq #"^(https?|mailto|ftp)://" id)
-        pname (if-let [pn (vu/find-prefix prefixes id)]
-                (if (= "_" (pn 0)) (if (seq (pn 1)) (pn 1)) (fmt-pname pn)))
-        res-uri (str "/resources/" (or pname id))
-        label (or label
-                  (if uri?
-                    (or pname (subs id (count (ffirst uri?))))
-                    (truncate trunc id)))]
-    (prn :reslink id uri? pname res-uri label)
+  (let [[res-uri pname uri?] (model/resource-uri prefixes id)
+        label (if label
+                (utils/truncate trunc label)
+                (if uri?
+                  (or pname (subs id (count (ffirst uri?))))
+                  (utils/truncate trunc id)))]
+    (prn :reslink id :pname pname :resu res-uri :label label)
     (if uri?
       (list
-       [:a {:href res-uri :title res-uri} (truncate trunc label)] " "
+       [:a {:href res-uri :title res-uri} label] " "
        (if (or uri? pname)
          [:a {:href id :title id}
           [:span.glyphicon.glyphicon-new-window]]))
@@ -114,7 +98,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
      (fn [{:syms [?other ?otitle ?val ?vtitle]}]
        [:tr
         [:td (resource-link prefixes ?other ?otitle)]
-        [:td (resource-link prefixes id nil)]
+        [:td (resource-link prefixes id id)]
         [:td (resource-link prefixes ?val ?vtitle)]])
      shared-pred)
     (map
@@ -122,5 +106,5 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
        [:tr
         [:td (resource-link prefixes ?other ?otitle)]
         [:td (resource-link prefixes ?pred ?ptitle)]
-        [:td (resource-link prefixes id nil)]])
+        [:td (resource-link prefixes id id)]])
      shared-obj)]))
