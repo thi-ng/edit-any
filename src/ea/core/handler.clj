@@ -37,24 +37,19 @@
 
 (defn parse-attribs
   [src]
-  (let [prefixes (:prefixes @state)]
-    (->> src
-         (str/split-lines)
-         (map
-          #(let [s (.indexOf % "=")]
-             (if (>= s 0)
-               (let [pname (subs % 0 s)
-                     oname (subs % (inc s))
-                     puri (vu/expand-pname prefixes pname)
-                     ouri (vu/expand-pname prefixes oname)]
-                 (if puri
-                   [puri (or ouri oname)]
-                   (warn "skipping unknown prefix in pname:" pname))))))
-         (filter identity)
-         (reduce
-          (fn [acc [k v]]
-            (update-in acc [k] (fnil conj []) v))
-          {}))))
+  (->> src
+       (str/split-lines)
+       (map
+        #(let [s (.indexOf % "=")]
+           (if (>= s 0)
+             (let [pname (subs % 0 s)
+                   oname (subs % (inc s))]
+               [pname oname]))))
+       (filter identity)
+       (reduce
+        (fn [acc [k v]]
+          (update-in acc [k] (fnil conj []) v))
+        {})))
 
 (defn replace-triples
   [src new]
@@ -79,16 +74,25 @@
         res (if-let [uri (vu/expand-pname prefixes id)] uri (str (prefixes "this") id))
         now (t/now)
         fnow (utils/format-date now)
+        attribs (merge-with
+                 #(into (if (vector? %) % [%]) %2)
+                 attribs (parse-attribs bulk-attribs))
+        _ (info :raw-attribs)
+        _ (pprint attribs)
         attribs (reduce-kv
-                 (fn [acc k v]
-                   (if-let [uri (vu/expand-pname prefixes k)]
-                     (assoc acc uri (mapv utils/line-endings (if (vector? v) v [v])))
-                     acc))
+                 (fn [acc p o]
+                   (if-let [puri (vu/expand-pname prefixes p)]
+                     (if puri
+                       (assoc acc puri
+                              (map #(or (vu/expand-pname prefixes %)
+                                        (utils/line-endings %))
+                                   (if (vector? o) o [o])))
+                       acc)))
                  {} attribs)
         auto-triples (if (model/new-resource? res)
                        [[res (:created dcterms) fnow]]
                        [[res (:modified dcterms) fnow]])
-        attribs (merge attribs (parse-attribs bulk-attribs))
+
         _ (info :attribs)
         _ (pprint attribs)
         src-triples (trio/select graph res nil nil)
