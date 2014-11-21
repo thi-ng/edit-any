@@ -48,9 +48,27 @@
             (->> "default-graph.edn"
                  io/resource
                  vu/load-vocab-triples)]
-        (dosync (alter state (constantly {:prefixes prefixes :graph (trio/as-model triples)})))
-        (spit "graph-0.edn" (sort (trio/select (:graph @state))))
-        (spit "prefixes-0.edn" (sort (keys (:prefixes @state))))))))
+        (dosync
+         (alter state
+                (constantly {:prefixes prefixes :graph (trio/as-model triples)})))))))
+
+(defn update!
+  [old new]
+  (->> (dosync
+        (alter state
+               (fn [{:keys [graph] :as state}]
+                 (let [graph (-> graph
+                                 (trio/remove-triples old)
+                                 (trio/add-triples new))
+                       prefixes (build-prefixes graph)]
+                   (prn :new-prefixes prefixes)
+                   (assoc state
+                     :prefixes prefixes
+                     :graph graph)))))
+       (:graph)
+       (trio/select)
+       (sort)
+       (spit "graph.edn")))
 
 (defn format-pname
   [[p n]] (str p ":" n))

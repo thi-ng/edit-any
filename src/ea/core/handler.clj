@@ -95,30 +95,18 @@
         new-triples (->> attribs
                          (map (fn [[p o]] [res (name p) o]))
                          (trio/triple-seq))
-        triples (replace-triples src-triples auto-triples)
-        triples (if replace
-                  (replace-triples triples new-triples)
-                  (->> (into triples new-triples)
-                       (filter #(not (empty? (last %))))))]
+        merged-triples (replace-triples src-triples auto-triples)
+        merged-triples (if replace
+                         (replace-triples merged-triples new-triples)
+                         (->> (into merged-triples new-triples)
+                              (filter #(not (empty? (last %))))))]
     (info :src)
     (pprint src-triples)
     (info :new)
     (pprint new-triples)
     (info :updated)
-    (pprint triples)
-    (dosync
-     (alter state
-            (fn [{:keys [prefixes graph] :as state}]
-              (let [graph (-> graph
-                              (trio/remove-triples src-triples)
-                              (trio/add-triples triples))
-                    prefixes (model/build-prefixes graph)]
-                (prn :new-prefixes prefixes)
-                (assoc state
-                  :prefixes prefixes
-                  :graph graph)))))
-    (spit "graph.edn" (sort (trio/select (:graph @state))))
-    (spit "prefixes.edn" (sort (keys (:prefixes @state))))
+    (pprint merged-triples)
+    (model/update! src-triples merged-triples)
     {::id id}))
 
 (defmulti handle-resource-get #(-> % :representation :media-type))
