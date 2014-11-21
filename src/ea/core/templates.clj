@@ -51,4 +51,5 @@
                          ['?tpl-id (:query ea) '?q]
                          ['?tpl-id (:instanceView ea) '?tpl]]}]}
        (q/query)
-       (map #(populate-template prefixes graph id %))))
+       (map #(populate-template prefixes graph id %))
+       (seq)))

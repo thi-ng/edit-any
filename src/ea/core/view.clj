@@ -75,7 +75,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
     [:li.active {:role "presentation"} [:a {:href "#preview" :role "tab" :data-toggle "tab"} "Preview"]]
     [:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]
     [:li {:role "presentation"} [:a {:href "#viz" :role "tab" :data-toggle "tab"} "Graph"]]
-    [:li {:role "presentation"} [:a {:href "#tpl" :role "tab" :data-toggle "tab"} "Template"]]]
+    (if tpl [:li {:role "presentation"} [:a {:href "#tpl" :role "tab" :data-toggle "tab"} "Template"]])]
    [:div.tab-content
     [:div#preview.tab-pane.fade.in.active {:role "tabpanel"}
      [:div#preview-body (md/md-to-html-string body)]]
@@ -86,7 +86,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
     [:div#viz.tab-pane.fade {:role "tabpanel"}
      [:h3 "Resource graph"]
      [:div.well [:h2 "TODO"]]]
-    [:div#tpl.tab-pane.fade {:role "tabpanel"} tpl]]])
+    (if tpl [:div#tpl.tab-pane.fade {:role "tabpanel"} tpl])]])
 
 (defn related-resource-table
   [prefixes id shared-pred shared-obj]
