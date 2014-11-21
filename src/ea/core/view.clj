@@ -64,7 +64,8 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
    [:h4 "Add attributes"]
    [:div.form-group [:textarea#new-attribs.form-control {:name "bulk-attribs" :rows 5}]]
    [:select#attr-templates.form-control (map (fn [{:keys [id tpl]}] [:option {:label id :value tpl}]) (cons {:id "Choose template..":value ""} templates))]
-   [:div.checkbox [:label [:input {:type "checkbox" :name "replace"}] " Replace existing"]]
+   [:div.checkbox
+    [:label [:input {:type "checkbox" :name "replace" :checked "checked"}] " Replace existing"]]
    [:div.form-group [:button.btn.btn-primary {:type "submit"} "Submit"]]])
 
 (defn content-tab-panels
