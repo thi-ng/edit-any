@@ -40,7 +40,9 @@
     (el/javascript-tag
      "hljs.initHighlightingOnLoad();
 $(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));});
-$(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-attribs\").val(e.target.value);});")]))
+$(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-attribs\").val(e.target.value);});")
+    ;;(include-js "/js/app.js")
+    ]))
 
 (defn attrib-sidebar
   [prefixes graph attribs templates]

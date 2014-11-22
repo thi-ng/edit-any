@@ -2,7 +2,8 @@
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
   :min-lein-version "2.0.0"
-  :dependencies [[org.clojure/clojure "1.6.0"]
+  :dependencies [[org.clojure/clojure "1.7.0-alpha4"]
+                 [org.clojure/clojurescript "0.0-2371"]
                  [compojure "1.2.0"]
                  [ring/ring-defaults "0.1.2"]
                  [liberator "0.12.2"]
@@ -11,9 +12,19 @@
                  [clj-time "0.8.0"]
                  [clj-jgit "0.8.2"]
                  [hiccup "1.0.5"]
-                 [org.clojars.toxi/markdown-clj "0.9.57" :exclusions [org.clojure/clojure]]]
-  :plugins [[lein-ring "0.8.13"]]
+                 [org.clojars.toxi/markdown-clj "0.9.57" :exclusions [org.clojure/clojure]]
+                 [freactive "0.1.0"]]
   :ring {:handler ea.core.handler/app}
-  :profiles
-  {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
-                        [ring-mock "0.1.5"]]}})
+  :profiles {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
+                                  [ring-mock "0.1.5"]]
+                   :plugins      [[lein-ring "0.8.13"]
+                                  [lein-cljsbuild "1.0.3"]]}}
+  :cljsbuild {:builds [{:id "dev"
+                        :source-paths ["src-cljs"]
+                        :compiler {:output-to "resources/public/js/app.js"
+                                   :optimizations :whitespace}}
+                       {:id "release"
+                        :source-paths ["src-cljs"]
+                        :compiler {:output-to "resources/public/js/app.js"
+                                   :optimizations :advanced
+                                   :pretty-print false}}]})

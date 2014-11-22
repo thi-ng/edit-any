@@ -35,6 +35,28 @@
      [id "time:year-month" m]
      [id "time:year-month-day" d]]))
 
+(def link-regexp
+  (re-pattern
+   (str "\\["
+        "([A-Za-z0-9\\-_]+:[A-Za-z0-9\\-_]*)" ;; pname
+        "?\\|?((\\w|\\s)+)\\]\\(" ;; title
+        "([\\/A-Za-z0-9#%&\\:\\?_\\-]+)" ;; uri
+        "\\)")))
+
+(defn parse-links
+  [req txt]
+  (->> txt
+       (re-seq link-regexp)
+       (reduce
+        (fn [acc [_ pname title _ uri]]
+          (if pname
+            (update acc pname (fnil conj [])
+                    (if (.startsWith uri "/")
+                      (str (name (:scheme req)) "://" (get-in req [:headers "host"]) uri)
+                      uri))
+            acc))
+        {})))
+
 (defn parse-attribs
   [src]
   (->> src
@@ -68,6 +90,7 @@
 
 (defn handle-resource-update
   [ctx]
+  (pprint ctx)
   (info :post (get-in ctx [:request :params]))
   (let [{:keys [id attribs bulk-attribs replace]} (get-in ctx [:request :params])
         {:keys [prefixes graph]} @state
@@ -76,7 +99,10 @@
         fnow (utils/format-date now)
         attribs (merge-with
                  #(into (if (vector? %) % [%]) %2)
-                 attribs (parse-attribs bulk-attribs))
+                 attribs
+                 (parse-attribs bulk-attribs)
+                 (if-let [desc (attribs "dcterms:description")]
+                   (parse-links (:request ctx) desc)))
         _ (info :raw-attribs)
         _ (pprint attribs)
         attribs (reduce-kv
