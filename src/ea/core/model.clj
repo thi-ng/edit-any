@@ -75,11 +75,11 @@
 
 (defn resource-uri
   [prefixes id]
-  (let [uri? (re-seq #"^(https?|mailto|ftp):" id)
+  (let [uri? (re-seq #"^(https?://|mailto:|ftp://)" id)
         pn (vu/find-prefix prefixes id)
         pname (if pn
                 (format-pname pn))
-        res-uri (if (and pn (= "this" (pn 0))) id (str "/resources/" (or pname id)))]
+        res-uri (if (and pn (= "this" (pn 0))) id (str (prefixes "this") (or pname id)))]
     [res-uri pname uri?]))
 
 (defn new-resource?
@@ -110,7 +110,7 @@
         :query [{:where [[id (:description dcterms) '?body]]}
                 {:union [[id (:label rdfs) '?title]]}]}
        (q/query)
-       (first)))
+       (q/accumulate-result-vars)))
 
 (defn get-other-resource-attribs
   [graph id]

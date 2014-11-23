@@ -21,7 +21,7 @@
                 (if uri?
                   (or pname (subs id (count (ffirst uri?))))
                   (utils/truncate trunc id)))]
-    ;;(prn :reslink id :pname pname :resu res-uri :label label)
+    (prn :reslink id :pname pname :resu res-uri :uri? uri? :label label)
     (if uri?
       (list
        [:a {:href res-uri :title res-uri} label] " "
@@ -31,12 +31,12 @@
       label)))
 
 (defn html-template
-  [& body]
+  [id & body]
   (html5
    [:head
     (apply include-css ["/css/bootstrap.min.css" "/css/main.css" "/highlight/styles/solarized_light.css"])
     (apply include-js ["/js/jquery-2.1.1.min.js" "/js/bootstrap.min.js" "/js/marked.min.js" "/highlight/highlight.pack.js"])]
-   [:body
+   [:body {:resource id}
     [:div.container-fluid body]
     (el/javascript-tag
      "hljs.initHighlightingOnLoad();
@@ -96,7 +96,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
     (if tpl [:div#tpl.tab-pane.fade {:role "tabpanel"} tpl])]])
 
 (defn related-resource-table
-  [prefixes id shared-pred shared-obj]
+  [prefixes id title shared-pred shared-obj]
   (prn :table-id id)
   (list
    [:h3 "Related resources "
@@ -106,7 +106,7 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
      (fn [{:syms [?other ?otitle ?val ?vtitle]}]
        [:tr
         [:td (resource-link prefixes ?other ?otitle)]
-        [:td (resource-link prefixes id id)]
+        [:td (resource-link prefixes id title)]
         [:td (resource-link prefixes ?val ?vtitle)]])
      shared-pred)
     (map
@@ -114,5 +114,5 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
        [:tr
         [:td (resource-link prefixes ?other ?otitle)]
         [:td (resource-link prefixes ?pred ?ptitle)]
-        [:td (resource-link prefixes id id)]])
+        [:td (resource-link prefixes id title)]])
      shared-obj)]))

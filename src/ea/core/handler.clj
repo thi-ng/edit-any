@@ -168,8 +168,9 @@
                id
                (str (prefixes "this") id)))
         __ (info :id id (-> ctx :request :uri))
-        {:syms [?body ?title] :as res} (model/get-resource-description graph id)
-        ?title (or ?title
+        res (model/get-resource-description graph id)
+        __ (info :body-res res)
+        ?title (or (first (res '?title))
                    (if-let [pn (vu/find-prefix prefixes id)]
                      (if (= "this" (pn 0)) (if (seq (pn 1)) (pn 1)) (model/format-pname pn))))
         template (tpl/build-resource-template prefixes graph id)
@@ -178,7 +179,7 @@
         shared-pred (model/get-shared-predicate graph id)
         shared-obj (model/get-shared-object graph id)
         res-uri (first (model/resource-uri prefixes id))]
-    ;;(info id :title ?title)
+    (info id :title ?title)
     (info :res-uri res-uri)
     (info :prefixes prefixes)
     (info id :attribs)
@@ -186,14 +187,15 @@
     ;;(info id :shared-p shared-pred)
     ;;(info id :shared-o shared-obj)
     (view/html-template
+     id
      [:div.row
       [:div.col-xs-12 [:h1 (or ?title id)]]]
      [:form {:method :post :action res-uri}
       [:div.row
        [:div.col-sm-8.col-md-9
-        (view/content-tab-panels prefixes ?body template)
+        (view/content-tab-panels prefixes (first (res '?body)) template)
         (when (or (seq shared-pred) (seq shared-obj))
-          (view/related-resource-table prefixes (or ?title id) shared-pred shared-obj))]
+          (view/related-resource-table prefixes id ?title shared-pred shared-obj))]
        (view/attrib-sidebar prefixes graph attribs attr-tpls)]])))
 
 (defresource resource [id]
@@ -201,7 +203,7 @@
   :allowed-methods [:get :post]
   :handle-ok handle-resource-get
   :post! handle-resource-update
-  :post-redirect? (fn [ctx] {:location (str "/resources/" (::id ctx))}))
+  :post-redirect? (fn [ctx] {:location (str (-> @state :prefixes (get "this")) (::id ctx))}))
 
 (defroutes app-routes
   (GET "/" [] (resp/redirect (str "/resources/Index")))

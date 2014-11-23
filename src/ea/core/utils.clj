@@ -23,7 +23,7 @@
   (let [prop-uri (vu/expand-pname prefixes (str/join prop))
         link (vu/expand-pname-maybe prefixes (str/join link))]
     (tx/escape-link
-     "<a href=\"" link "\" property=\"" prop "\">" title "</a> (<a href=\"" prop-uri "\">" prop "</a>)")))
+     "<a href=\"" link "\" property=\"" prop-uri "\" title=\"" prop "\">" title "</a>")))
 
 (defn md-link
   [prefixes]
