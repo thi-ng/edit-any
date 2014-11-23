@@ -75,7 +75,7 @@
 
 (defn resource-uri
   [prefixes id]
-  (let [uri? (re-seq #"^(https?|mailto|ftp)://" id)
+  (let [uri? (re-seq #"^(https?|mailto|ftp):" id)
         pn (vu/find-prefix prefixes id)
         pname (if pn
                 (format-pname pn))

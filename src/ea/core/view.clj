@@ -8,7 +8,8 @@
    [hiccup.page :refer [html5 include-js include-css]]
    [hiccup.element :as el]
    [hiccup.form :as form]
-   [markdown.core :as md]))
+   [markdown.core :as md]
+   [markdown.transformers :as mdtx]))
 
 ;; pname? (re-seq #"^([a-zA-Z0-9]+:[a-zA-Z0-9]+)" id)
 
@@ -20,11 +21,11 @@
                 (if uri?
                   (or pname (subs id (count (ffirst uri?))))
                   (utils/truncate trunc id)))]
-    (prn :reslink id :pname pname :resu res-uri :label label)
+    ;;(prn :reslink id :pname pname :resu res-uri :label label)
     (if uri?
       (list
        [:a {:href res-uri :title res-uri} label] " "
-       (if (or uri? pname)
+       (if (and (or uri? pname) (not (.startsWith id (prefixes "this"))))
          [:a {:href id :title id}
           [:span.glyphicon.glyphicon-new-window]]))
       label)))
@@ -39,7 +40,7 @@
     [:div.container-fluid body]
     (el/javascript-tag
      "hljs.initHighlightingOnLoad();
-$(\"#editor\").blur(function(e){$(\"#preview-body\").html(marked(e.target.value));});
+$(\"#editor\").blur(function(e){$(\"#content-body\").html(marked(e.target.value));});
 $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-attribs\").val(e.target.value);});")
     ;;(include-js "/js/app.js")
     ]))
@@ -71,20 +72,24 @@ $(\"#attr-templates\").change(function(e){if (e.target.value!=\"\") $(\"#new-att
    [:div.form-group [:button.btn.btn-primary {:type "submit"} "Submit"]]])
 
 (defn content-tab-panels
-  [body tpl]
+  [prefixes body tpl]
   [:div {:role "tabpanel"}
    [:ul.nav.nav-tabs {:role "tablist"}
-    [:li.active {:role "presentation"} [:a {:href "#preview" :role "tab" :data-toggle "tab"} "Preview"]]
-    [:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]
+    [:li.active {:role "presentation"} [:a {:href "#content" :role "tab" :data-toggle "tab"} "Content"]]
+    ;;[:li {:role "presentation"} [:a {:href "#edit" :role "tab" :data-toggle "tab"} "Edit"]]
     [:li {:role "presentation"} [:a {:href "#viz" :role "tab" :data-toggle "tab"} "Graph"]]
     (if tpl [:li {:role "presentation"} [:a {:href "#tpl" :role "tab" :data-toggle "tab"} "Template"]])]
    [:div.tab-content
-    [:div#preview.tab-pane.fade.in.active {:role "tabpanel"}
-     [:div#preview-body (md/md-to-html-string body)]]
-    [:div#edit.tab-pane.fade {:role "tabpanel"}
-     [:h3 "Edit resource description"]
-     [:p [:textarea#editor.form-control {:name "attribs[dcterms:description]" :rows 10} body]]
-     [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]
+    [:div#content.tab-pane.fade.in.active {:role "tabpanel"}
+     [:div#content-body
+      (md/md-to-html-string
+       body
+       :replacement-transformers
+       (cons (utils/md-link prefixes) mdtx/transformer-vector))]]
+    #_[:div#edit.tab-pane.fade {:role "tabpanel"}
+       [:h3 "Edit resource description"]
+       [:p [:textarea#editor.form-control {:name "attribs[dcterms:description]" :rows 10} body]]
+       [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]]
     [:div#viz.tab-pane.fade {:role "tabpanel"}
      [:h3 "Resource graph"]
      [:div.well [:h2 "TODO"]]]

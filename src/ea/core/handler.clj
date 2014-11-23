@@ -94,14 +94,18 @@
   (info :post (get-in ctx [:request :params]))
   (let [{:keys [id attribs bulk-attribs replace]} (get-in ctx [:request :params])
         {:keys [prefixes graph]} @state
-        res (if-let [uri (vu/expand-pname prefixes id)] uri (str (prefixes "this") id))
+        res (if-let [uri (vu/expand-pname prefixes id)]
+              uri
+              (if (re-find #"^(https?|ftp|mailto):" id)
+               id
+               (str (prefixes "this") id)))
         now (t/now)
         fnow (utils/format-date now)
         attribs (merge-with
                  #(into (if (vector? %) % [%]) %2)
                  attribs
                  (parse-attribs bulk-attribs)
-                 (if-let [desc (attribs "dcterms:description")]
+                 (if-let [desc (and attribs (attribs "dcterms:description"))]
                    (parse-links (:request ctx) desc)))
         _ (info :raw-attribs)
         _ (pprint attribs)
@@ -158,7 +162,11 @@
   (let [{:keys [prefixes graph]} @state
         id (-> ctx :request :params :id)
         __ (info :id (vu/expand-pname prefixes id) id)
-        id (if-let [uri (vu/expand-pname prefixes id)] uri (str (prefixes "this") id))
+        id (if-let [uri (vu/expand-pname prefixes id)]
+             uri
+             (if (re-find #"^(https?|ftp|mailto):" id)
+               id
+               (str (prefixes "this") id)))
         __ (info :id id (-> ctx :request :uri))
         {:syms [?body ?title] :as res} (model/get-resource-description graph id)
         ?title (or ?title
@@ -179,11 +187,11 @@
     ;;(info id :shared-o shared-obj)
     (view/html-template
      [:div.row
-      [:div.col-xs-12 [:h1 ?title]]]
+      [:div.col-xs-12 [:h1 (or ?title id)]]]
      [:form {:method :post :action res-uri}
       [:div.row
        [:div.col-sm-8.col-md-9
-        (view/content-tab-panels ?body template)
+        (view/content-tab-panels prefixes ?body template)
         (when (or (seq shared-pred) (seq shared-obj))
           (view/related-resource-table prefixes (or ?title id) shared-pred shared-obj))]
        (view/attrib-sidebar prefixes graph attribs attr-tpls)]])))

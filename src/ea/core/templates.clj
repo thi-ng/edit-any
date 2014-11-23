@@ -14,8 +14,10 @@
 (defn inject-result-var
   [res x]
   (if (q/qvar? x)
-    (let [[[_ k v]] (re-seq #"^?([A-Za-z0-9\-_]+):([A-Za-z0-9\-_]+)$" (name x))]
-      (get-in res [(keyword k) (symbol (str \? v))]))
+    (let [[[_ k v]] (re-seq #"^?([A-Za-z0-9\-_]+):([A-Za-z0-9\-_]+)$" (name x))
+          qres (res (keyword k))
+          qvar (symbol (str \? v))]
+      (if (map? qres) (qres qvar) (some #(% qvar) qres)))
     x))
 
 (defn expand-pname-in-query
@@ -33,7 +35,7 @@
         qres   (reduce-kv
                 (fn [acc k spec]
                   (let [spec (assoc spec :from graph :values {'?this #{this}})
-                        res  (first (q/query spec))]
+                        res  (q/query spec)]
                     (assoc acc k res)))
                 {} qspecs)]
     (info :tpl-res qres)
