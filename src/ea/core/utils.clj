@@ -9,7 +9,7 @@
 (defn truncate
   [limit s]
   (if (and limit (> (count s) limit))
-    (str (subs s 0 limit) "\u2026")
+    (str (subs s 0 limit) "\u2026") ;; append ellipsis
     s))
 
 (defn format-date

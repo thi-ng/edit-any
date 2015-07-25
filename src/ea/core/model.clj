@@ -1,5 +1,6 @@
 (ns ea.core.model
   (:require
+   [ea.core.protocols :as proto]
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
    [thi.ng.trio.vocabs :refer [defvocab]]
@@ -8,8 +9,11 @@
    [thi.ng.trio.vocabs.rdfs :refer [rdfs]]
    [thi.ng.trio.vocabs.dcterms :refer [dcterms]]
    [thi.ng.trio.vocabs.owl :refer [owl]]
+   [thi.ng.xerror.core :as err]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
+   [clojure.core.async :as async]
+   [com.stuartsierra.component :as comp]
    [taoensso.timbre :refer [info warn error]]))
 
 (def default-prefixes
@@ -24,8 +28,6 @@
   :prefix
   :query)
 
-(defonce state (ref {}))
-
 (defn build-prefixes
   [graph]
   (->> (q/query
@@ -36,6 +38,124 @@
                            ['?vocab (:prefix ea) '?prefix]
                            ['?uri (:type rdf) (:Ontology owl)]]}]})
        (reduce (fn [acc {:syms [?prefix ?uri]}] (assoc acc ?prefix ?uri)) {})))
+
+(defn load-default-graph
+  []
+  (let [{:keys [prefixes triples]}
+        (->> "default-graph.edn"
+             io/resource
+             vu/load-vocab-triples)]
+    {:graph (trio/as-model triples) :prefixes prefixes}))
+
+(defrecord MemoryDB [config state]
+  comp/Lifecycle
+  (start
+    [_]
+    (info "starting trio memstore using: " (:path config))
+    (->> (try
+           (let [graph (->> config :path slurp edn/read-string trio/as-model)]
+             {:graph graph :prefixes (build-prefixes graph)})
+           (catch Exception e
+             (load-default-graph)))
+         (ref)
+         (assoc _ :state)))
+  (stop
+    [_]
+    (info "stopping trio memstore...")
+    _)
+  proto/IDBModel
+  (prefix-map [_] (:prefixes @state))
+  (update-prefix-map [_]
+    (dosync
+     (alter state assoc :prefixes (build-prefixes (:graph @state))))
+    _)
+  (graph [_] (:graph @state))
+  )
+
+(defn make-db
+  [db-conf]
+  (condp = (:type db-conf)
+    :memory (MemoryDB. db-conf nil)
+    (err/unsupported! (str "Unsupported DB type: " (:type db-conf)))))
+
+(defn format-pname
+  [[p n]] (str p ":" n))
+
+(defn resource-uri
+  [prefixes id]
+  (let [uri?    (re-seq #"^(https?://|mailto:|ftp://)" id)
+        pn      (vu/find-prefix prefixes id)
+        pname   (if pn (format-pname pn))
+        res-uri (if (and pn (= "this" (pn 0))) id (str (prefixes "this") (or pname id)))]
+    [res-uri pname uri?]))
+
+(defn canonical-resource-uri
+  [model uri]
+  (let [prefixes (proto/prefix-map model)
+        uri?     (re-seq #"^(https?://|mailto:|ftp://)" uri)
+        pn       (vu/find-prefix prefixes uri)
+        pname    (if pn (format-pname pn))
+        res-uri  (if (and pn (= "this" (pn 0))) uri (str (prefixes "this") (or pname uri)))]
+    [res-uri pname uri?]))
+
+(defn as-resource-uri
+  [model id]
+  (let [prefixes (proto/prefix-map model)]
+    (if-let [uri (vu/expand-pname prefixes id)]
+      uri
+      (if (re-find #"^(https?|ftp|mailto):" id)
+        id
+        (str (prefixes "this") id)))))
+
+(defn resource-title-body
+  [model uri]
+  (-> {:select :*
+       :from   (proto/graph model)
+       :query  [{:where [[uri (:description dcterms) '?body]]}
+                {:union [[uri (:label rdfs) '?title]]}]}
+      (q/query)
+      (q/accumulate-result-vars)))
+
+(defn resource-title
+  [model res uri]
+  (or (first (res '?title))
+      (if-let [pn (vu/find-prefix (proto/prefix-map model) uri)]
+        (if (= "this" (pn 0)) (if (seq (pn 1)) (pn 1)) (format-pname pn)))))
+
+(defn other-resource-attribs
+  [model id]
+  (q/query
+   {:select :*
+    :from   (proto/graph model)
+    :query  [{:where [[id '?att '?val]]
+              :filter {'?att #(not (#{(:description dcterms) (:label rdfs)} %))}}
+             {:optional [['?att (:label rdfs) '?atitle]]}
+             {:optional [['?val (:label rdfs) '?vtitle]]}]
+    :group  '?att}))
+
+(defn facet-shared-predicate
+  [model id]
+  (q/query
+   {:select    :*
+    :from      (proto/graph model)
+    :query     [{:where [['?other id '?val]]}
+                {:optional [['?other (:label rdfs) '?otitle]]}
+                {:optional [['?val (:label rdfs) '?vtitle]]}]
+    :order-asc '[?other ?val]}))
+
+(defn facet-shared-object
+  [model id]
+  (q/query
+   {:select    :*
+    :from      (proto/graph model)
+    :query     [{:where [['?other '?pred id]]}
+                {:optional [['?other (:label rdfs) '?otitle]]}
+                {:optional [['?pred (:label rdfs) '?ptitle]]}]
+    :order-asc '[?other ?pred]}))
+
+;;;;;;;;;;;;;;;;;; ooooollllldddddd
+
+(defonce state (ref {}))
 
 (defn init!
   []
@@ -63,24 +183,12 @@
                        prefixes (build-prefixes graph)]
                    (prn :new-prefixes prefixes)
                    (assoc state
-                     :prefixes prefixes
-                     :graph graph)))))
+                          :prefixes prefixes
+                          :graph graph)))))
        (:graph)
        (trio/select)
        (sort)
        (spit "graph.edn")))
-
-(defn format-pname
-  [[p n]] (str p ":" n))
-
-(defn resource-uri
-  [prefixes id]
-  (let [uri? (re-seq #"^(https?://|mailto:|ftp://)" id)
-        pn (vu/find-prefix prefixes id)
-        pname (if pn
-                (format-pname pn))
-        res-uri (if (and pn (= "this" (pn 0))) id (str (prefixes "this") (or pname id)))]
-    [res-uri pname uri?]))
 
 (defn new-resource?
   [id] (nil? (seq (trio/select (:graph @state) id nil nil))))
@@ -111,34 +219,3 @@
                 {:union [[id (:label rdfs) '?title]]}]}
        (q/query)
        (q/accumulate-result-vars)))
-
-(defn get-other-resource-attribs
-  [graph id]
-  (q/query
-   {:select :*
-    :from graph
-    :query [{:where [[id '?att '?val]]
-             :filter {'?att #(not (#{(:description dcterms) (:label rdfs)} %))}}
-            {:optional [['?att (:label rdfs) '?atitle]]}
-            {:optional [['?val (:label rdfs) '?vtitle]]}]
-    :group '?att}))
-
-(defn get-shared-predicate
-  [graph id]
-  (q/query
-   {:select :*
-    :from graph
-    :query [{:where [['?other id '?val]]}
-            {:optional [['?other (:label rdfs) '?otitle]]}
-            {:optional [['?val (:label rdfs) '?vtitle]]}]
-    :order-asc '[?other ?val]}))
-
-(defn get-shared-object
-  [graph id]
-  (q/query
-   {:select :*
-    :from graph
-    :query [{:where [['?other '?pred id]]}
-            {:optional [['?other (:label rdfs) '?otitle]]}
-            {:optional [['?pred (:label rdfs) '?ptitle]]}]
-    :order-asc '[?other ?pred]}))

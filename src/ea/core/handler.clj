@@ -20,7 +20,7 @@
    [clj-time.core :as t]
    [taoensso.timbre :refer [info warn error]]))
 
-(taoensso.timbre/set-config! [:ns-blacklist] ['thi.ng.trio.query])
+;;(taoensso.timbre/merge-config! {:ns-blacklist ['thi.ng.trio.query]})
 
 ;; (taoensso.timbre/set-config! [:ns-blacklist] [])
 
@@ -175,9 +175,9 @@
                      (if (= "this" (pn 0)) (if (seq (pn 1)) (pn 1)) (model/format-pname pn))))
         template (tpl/build-resource-template prefixes graph id)
         attr-tpls (model/get-attrib-templates prefixes graph)
-        attribs (model/get-other-resource-attribs graph id)
-        shared-pred (model/get-shared-predicate graph id)
-        shared-obj (model/get-shared-object graph id)
+        attribs (model/other-resource-attribs graph id)
+        shared-pred (model/facet-shared-predicate graph id)
+        shared-obj (model/facet-shared-object graph id)
         res-uri (first (model/resource-uri prefixes id))]
     (info id :title ?title)
     (info :res-uri res-uri)
@@ -198,7 +198,7 @@
           (view/related-resource-table prefixes id ?title shared-pred shared-obj))]
        (view/attrib-sidebar prefixes graph attribs attr-tpls)]])))
 
-(defresource resource [id]
+(defresource ea-resource [id]
   :available-media-types ["text/html" "application/edn" "application/json"]
   :allowed-methods [:get :post]
   :handle-ok handle-resource-get
@@ -207,7 +207,7 @@
 
 (defroutes app-routes
   (GET "/" [] (resp/redirect (str "/resources/Index")))
-  (ANY ["/resources/:id" :id #".*"] [id] (resource id)))
+  (ANY ["/resources/:id" :id #".*"] [id] (ea-resource id)))
 
 (def app
   (->> (assoc-in site-defaults [:security :anti-forgery] false)
