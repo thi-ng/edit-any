@@ -47,7 +47,8 @@
          :attribs  attribs
          :attr-tpl attr-tpls
          :preds shared-pred
-         :obj   shared-obj}
+         :obj   shared-obj
+         :prefixes (proto/prefix-map model)}
         (pr-str)
         (resp/response)
         (resp/content-type accept))))

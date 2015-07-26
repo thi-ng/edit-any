@@ -15,6 +15,12 @@
 
 (def stringify (map #(if (number? %) % (name %))))
 
+(defn truncate
+  [limit s]
+  (if (and limit (> (count s) limit))
+    (str (subs s 0 limit) "\u2026") ;; append ellipsis
+    s))
+
 (defn assoc-in*
   "Like clojure.core/assoc-in only defaults to creation of
   intermediate vectors if a missing key is numeric."

@@ -5,12 +5,31 @@
   (:require
    [ea.router :as router]
    [ea.markdown :as md]
+   [ea.model :as model]
+   [ea.utils :as utils]
    [re-frame.core :refer [subscribe dispatch]]
    [clojure.string :as str]))
 
+(defn resource-link
+  [prefixes id label & [trunc]]
+  (let [[res-uri pname uri?] (model/resource-uri prefixes id)
+        label (if label
+                (utils/truncate trunc label)
+                (if uri?
+                  (or pname (subs id (count (ffirst uri?))))
+                  (utils/truncate trunc id)))]
+    (info :reslink id :pname pname :resu res-uri :uri? uri? :label label)
+    (if uri?
+      (list
+       [:a {:href res-uri :title res-uri} label] " "
+       (if (and (or uri? pname) (not= 0 (.indexOf id (prefixes "this"))))
+         [:a {:href id :title id}
+          [:span.glyphicon.glyphicon-new-window]]))
+      label)))
+
 (defn attrib-sidebar
   [res]
-  (let [attribs (:attribs res)]
+  (let [{:keys [prefixes attribs]} res]
     [:div#sidebar.col-sm-4.col-md-3
      [:h4 "Attributes "
       [:span.label.label-default (reduce #(+ % (count (val %2))) 0 attribs)]]
@@ -18,15 +37,15 @@
       (map
        (fn [[attr vals]]
          (list
-          ;;[:h5.attrib (resource-link prefixes attr ((first vals) '?atitle) 30)]
-          [:h5.attrib attr]
+          [:h5.attrib (resource-link prefixes attr ((first vals) '?atitle) 30)]
+          ;;[:h5.attrib attr]
           [:ul
            (map
             (fn [{:syms [?val ?vtitle]}]
               (info :attr ?val ?vtitle)
               [:li
-               ;;(resource-link prefixes ?val ?vtitle 30) " "
-               ?val " "
+               (resource-link prefixes ?val ?vtitle 30) " "
+               ;;?val " "
                [:a.delete {:href "#"} [:span.glyphicon.glyphicon-remove]]])
             vals)]))
        (sort-by key attribs))]]))
