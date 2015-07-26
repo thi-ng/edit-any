@@ -31,13 +31,14 @@
     (with-cache-buster include-css
       "/css/bootstrap.min.css"
       "/css/main.css"
-      "/highlight/styles/solarized_light.css")
-    (apply include-js ["/highlight/highlight.pack.js"])]
+      (:hljs-style-uri config))
+    (apply include-js ["/js/highlight/highlight.pack.js" "/js/marked.min.js"])]
    [:body
     [:div#app.container-fluid
      [:div.row
       [:div.col-xs-12
        [:i.fa.fa-spinner.fa-spin] " Loading..."]]]
     (el/javascript-tag "// var __XSRF_TOKEN__;")
-    (with-cache-buster include-js "/js/app.js")
+    (with-cache-buster include-js "/js/compiled/app.js")
+    (el/javascript-tag "ea.core.main();")
     (ga-tracker (:google-analytics-id config))]))

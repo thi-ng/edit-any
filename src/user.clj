@@ -6,15 +6,17 @@
    [taoensso.timbre :refer [info warn error]]))
 
 (defn init []
-  (alter-var-root #'ea/system
-    (constantly (ea/make-system (ea/get-config)))))
+  (alter-var-root
+   #'ea/system
+   (constantly (ea/make-system (ea/get-config)))))
 
 (defn start []
   (alter-var-root #'ea/system comp/start))
 
 (defn stop []
-  (alter-var-root #'ea/system
-    (fn [s] (when s (comp/stop s)))))
+  (alter-var-root
+   #'ea/system
+   (fn [s] (when s (comp/stop s)))))
 
 (defn go []
   (init)

@@ -24,7 +24,7 @@
 
 ;; (taoensso.timbre/set-config! [:ns-blacklist] [])
 
-(model/init!)
+;; (model/init!)
 
 (defn date-triples
   [id dt]
