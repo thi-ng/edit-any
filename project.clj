@@ -44,6 +44,8 @@
 
               :resource-paths ["config/dev"]
 
+              :repl-options   {:init-ns user}
+
               :figwheel       {:css-dirs ["resources/public/css"]
                                ;;:ring-handler metaseams.handler/app
                                }

@@ -34,7 +34,7 @@
         res         (model/resource-title-body model uri)
         title       (model/resource-title model res uri)
         ;;tpl         (tpl/build-resource-template prefixes graph id)
-        ;;attr-tpls   (model/get-attrib-templates prefixes graph)
+        attr-tpls   (model/all-attrib-templates model)
         attribs     (model/other-resource-attribs model uri)
         shared-pred (model/facet-shared-predicate model uri)
         shared-obj  (model/facet-shared-object model uri)
@@ -45,7 +45,7 @@
          :res-uri res-uri
          :title title
          :attribs  attribs
-         ;;:attr-tpl attr-tpls
+         :attr-tpl attr-tpls
          :preds shared-pred
          :obj   shared-obj}
         (pr-str)

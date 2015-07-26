@@ -47,22 +47,42 @@
              vu/load-vocab-triples)]
     {:graph (trio/as-model triples) :prefixes prefixes}))
 
-(defrecord MemoryDB [config state]
+(defn make-graph-writer
+  [path]
+  (let [ch (async/chan 16)]
+    (async/go-loop []
+      (let [g (async/<! ch)]
+        (when g
+          (info "writing graph: " path "triples:" (count g))
+          (try
+            (spit path g)
+            (catch Exception e (warn e "couldn't write graph")))
+          (recur))))
+    ch))
+
+(defrecord MemoryDB [config state write-chan]
   comp/Lifecycle
   (start
     [_]
-    (info "starting trio memstore using: " (:path config))
-    (->> (try
-           (let [graph (->> config :path slurp edn/read-string trio/as-model)]
-             {:graph graph :prefixes (build-prefixes graph)})
-           (catch Exception e
-             (load-default-graph)))
-         (ref)
-         (assoc _ :state)))
+    (let [path (:path config)]
+      (info "starting trio memstore using: " path)
+      (->> (try
+             (info "attempt reading graph...")
+             (let [graph (->> path slurp edn/read-string trio/as-model)]
+               {:graph graph :prefixes (build-prefixes graph)})
+             (catch Exception e
+               (load-default-graph)))
+           (ref)
+           (assoc _ :write-chan (make-graph-writer path) :state))))
   (stop
     [_]
     (info "stopping trio memstore...")
-    _)
+    (if write-chan
+      (do (info "closing write channel")
+          (async/close! write-chan)
+          (assoc _ :write-chan nil))
+      _))
+
   proto/IDBModel
   (prefix-map [_] (:prefixes @state))
   (update-prefix-map [_]
@@ -70,12 +90,24 @@
      (alter state assoc :prefixes (build-prefixes (:graph @state))))
     _)
   (graph [_] (:graph @state))
-  )
+  (update-graph [_ old new]
+    (dosync
+     (alter state
+            (fn [{:keys [graph] :as state}]
+              (let [graph (-> graph
+                              (trio/remove-triples old)
+                              (trio/add-triples new))
+                    prefixes (build-prefixes graph)]
+                (assoc state
+                       :prefixes prefixes
+                       :graph graph)))))
+    (info "updated graph, new triples: " new)
+    (async/>! write-chan (trio/select (:graph @state)))))
 
 (defn make-db
   [db-conf]
   (condp = (:type db-conf)
-    :memory (MemoryDB. db-conf nil)
+    :memory (MemoryDB. db-conf nil nil)
     (err/unsupported! (str "Unsupported DB type: " (:type db-conf)))))
 
 (defn format-pname
@@ -152,6 +184,16 @@
                 {:optional [['?other (:label rdfs) '?otitle]]}
                 {:optional [['?pred (:label rdfs) '?ptitle]]}]
     :order-asc '[?other ?pred]}))
+
+;; TODO cache results
+(defn all-attrib-templates
+  [model]
+  (q/query
+   {:select [{:id {:use '?id :fn #(format-pname (vu/find-prefix (proto/prefix-map model) %))}}
+             {:tpl '?tpl}]
+    :from   (proto/graph model)
+    :query  [{:where [['?id (:type rdf) (:AttributeCollection ea)]
+                      ['?id (:description dcterms) '?tpl]]}]}))
 
 ;;;;;;;;;;;;;;;;;; ooooollllldddddd
 
