@@ -21,9 +21,10 @@
     (info :reslink id :pname pname :resu res-uri :uri? uri? :label label)
     (if uri?
       (list
-       [:a {:href res-uri :title res-uri} label] " "
+       [:a {:key res-uri :href res-uri :title res-uri
+            :on-click (utils/prevent #(dispatch [:nav-trigger (str "resources/" pname)]))} label] " "
        (if (and (or uri? pname) (not= 0 (.indexOf id (prefixes "this"))))
-         [:a {:href id :title id}
+         [:a {:key id :href id :title id}
           [:span.glyphicon.glyphicon-new-window]]))
       label)))
 
@@ -37,15 +38,12 @@
       (map
        (fn [[attr vals]]
          (list
-          [:h5.attrib (resource-link prefixes attr ((first vals) '?atitle) 30)]
-          ;;[:h5.attrib attr]
-          [:ul
+          [:h5.attrib {:key (str "hd-" attr)} (resource-link prefixes attr ((first vals) '?atitle) 30)]
+          [:ul {:key (str "ul-" attr)}
            (map
             (fn [{:syms [?val ?vtitle]}]
-              (info :attr ?val ?vtitle)
-              [:li
+              [:li {:key (str attr ?val)}
                (resource-link prefixes ?val ?vtitle 30) " "
-               ;;?val " "
                [:a.delete {:href "#"} [:span.glyphicon.glyphicon-remove]]])
             vals)]))
        (sort-by key attribs))]]))

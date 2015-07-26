@@ -49,12 +49,18 @@
        (assoc-in [:session :current-resource] nil))))
 
 (register-handler
+ :nav-trigger
+ (fn [db [_ route]]
+   (info :nav-trigger route)
+   (router/trigger! route)
+   db))
+
+(register-handler
  :load-resource
  (fn [db [_ route]]
    (utils/do-request
     {:uri     (server-route route)
      :success (fn [_ data]
-                (info :response data)
                 (dispatch [:resource-loaded data]))})
    (assoc-in db [:session :current-resource] nil)))
 

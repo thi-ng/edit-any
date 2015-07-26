@@ -90,3 +90,7 @@
              (.setToken history default-uri)
              (dispatch-route default-route))))))
     (.setEnabled true)))
+
+(defn trigger!
+  [route]
+  (.setToken history route))
