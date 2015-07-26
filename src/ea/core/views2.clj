@@ -17,7 +17,7 @@
   [id]
   (when id
     (el/javascript-tag
-     (str "(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create', '" id "', 'auto');ga('send', 'pageview');"))))
+     (str "(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create','" id "','auto');ga('send','pageview');"))))
 
 (defn html-template
   [req config]
@@ -38,7 +38,11 @@
      [:div.row
       [:div.col-xs-12
        [:i.fa.fa-spinner.fa-spin] " Loading..."]]]
-    (el/javascript-tag "// var __XSRF_TOKEN__;")
+    (el/javascript-tag
+     (format
+      "var __EA_ROUTE__=\"resources/%s\";
+       var __EA_MD_RENDERER__=new marked.Renderer();"
+      (-> req :params :id)))
     (with-cache-buster include-js "/js/compiled/app.js")
     (el/javascript-tag "ea.core.main();")
     (ga-tracker (:google-analytics-id config))]))

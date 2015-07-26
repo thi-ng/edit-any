@@ -23,6 +23,7 @@
                  [thi.ng/trio "0.2.0-SNAPSHOT"]
                  [thi.ng/validate "0.1.3"]
                  [thi.ng/color "0.3.1"]
+                 [thi.ng/domus "0.2.0"]
                  [org.clojars.toxi/markdown-clj "0.9.57" :exclusions [org.clojure/clojure]]
 
                  [reagent "0.5.0"]
