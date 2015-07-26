@@ -18,11 +18,13 @@
                 (if uri?
                   (or pname (subs id (count (ffirst uri?))))
                   (utils/truncate trunc id)))]
-    (info :reslink id :pname pname :resu res-uri :uri? uri? :label label)
+    ;;(info :reslink id :pname pname :resu res-uri :uri? uri? :label label)
     (if uri?
       (list
        [:a {:key res-uri :href res-uri :title res-uri
-            :on-click (utils/prevent #(dispatch [:nav-trigger (str "resources/" pname)]))} label] " "
+            :on-click (utils/prevent
+                       #(dispatch [:nav-trigger (str "resources/" (or pname id))]))}
+        label] " "
        (if (and (or uri? pname) (not= 0 (.indexOf id (prefixes "this"))))
          [:a {:key id :href id :title id}
           [:span.glyphicon.glyphicon-new-window]]))

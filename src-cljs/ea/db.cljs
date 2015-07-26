@@ -46,7 +46,8 @@
    ;;(dispatch [:nav-close-all])
    (-> db
        (assoc-in [:session :current-page] route)
-       (assoc-in [:session :current-resource] nil))))
+       #_(assoc-in [:session :current-resource] nil)
+       )))
 
 (register-handler
  :nav-trigger
@@ -62,7 +63,8 @@
     {:uri     (server-route route)
      :success (fn [_ data]
                 (dispatch [:resource-loaded data]))})
-   (assoc-in db [:session :current-resource] nil)))
+   #_(assoc-in db [:session :current-resource] nil)
+   db))
 
 (register-handler
  :resource-loaded

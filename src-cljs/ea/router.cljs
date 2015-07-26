@@ -68,6 +68,13 @@
            (assoc spec :params params)))))
    routes))
 
+(defn split-token
+  [token]
+  (let [items (str/split token "/")]
+    (if-let [i (some (fn [[i x]] (if (#{"http:" "https:"} x) i)) (map-indexed vector items))]
+      (concat (take i items) [(str/join "/" (drop i items))])
+      items)))
+
 (defn start!
   [routes default-route default-uri dispatch-route user]
   (info "starting router...")
@@ -81,7 +88,7 @@
                         (.setToken history init-route)
                         init-route)
                       (.-token e))
-             route  (str/split token "/")
+             route  (split-token token)
              route' (match-route routes route @user)]
          (debug :route route :token token :id (:id route'))
          (if route'

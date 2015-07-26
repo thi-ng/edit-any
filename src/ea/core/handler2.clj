@@ -3,6 +3,7 @@
    [ea.core.protocols :as proto]
    [ea.core.model :as model]
    [ea.core.views2 :as views]
+   [ea.core.instrument :as instr]
    [thi.ng.trio.vocabs.utils :as vu]
    [manifold.stream :as s]
    [manifold.deferred :as d]
@@ -27,7 +28,7 @@
     (conneg/best-allowed-content-type accept ["text/html" "application/edn"])
     (str/join "/" accept)))
 
-(defn handle-resource-get
+(defn handle-resource-get-edn
   [req model accept]
   (let [id          (-> req :params :id)
         uri         (model/as-resource-uri model id)
@@ -53,15 +54,21 @@
         (resp/response)
         (resp/content-type accept))))
 
+(defn handle-resource-get
+  [req model config]
+  (let [accept (negotiate-media-type req)]
+    (cond
+      (= "application/edn" accept) (handle-resource-get-edn req model accept)
+      :else                        (views/html-template req config))))
+
 (defn build-routes
   [config model]
   (compojure/routes
    (GET "/" [] (resp/redirect (str "/resources/Index")))
-   (GET ["/resources/:id" :id #".*"] [:as req]
-        (let [accept (negotiate-media-type req)]
-          (cond
-            (= "application/edn" accept) (handle-resource-get req model accept)
-            :else                        (views/html-template req config))))
+   (GET ["/resources/:id" :id #".*"] [id :as req]
+        (let [[resp time] (instr/timed-action (handle-resource-get req model config))]
+          (info :response-time time id)
+          resp))
    (route/resources "/")
    (route/not-found "404")))
 

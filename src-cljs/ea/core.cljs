@@ -13,15 +13,15 @@
    [reagent.core :as reagent]))
 
 (def validators
-  {:slug     [(v/matches #"^[\w\-]+$")]
-   :pname    [(v/matches #"^([A-Za-z0-9\\-_]+:[A-Za-z0-9\\-_]*)|(\w+)$")]
-   :uuid4    [(v/uuid4)]})
+  {:slug        [(v/matches #"^[\w\-]+$")]
+   :resource-id [(v/matches #"(\w+:(//)?.+)|(\w+:[A-Za-z0-9\-_]*)|(\w+)")]
+   :uuid4       [(v/uuid4)]})
 
 (def config
   {:routes
    [{:id        :resource-view
      :match     ["resources" :id]
-     :validate  {:id {:validate (:pname validators)}}
+     :validate  {:id {:validate (:resource-id validators)}}
      :auth      false
      :component views/resource-view}]
    :default-route-index 0
