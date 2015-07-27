@@ -84,6 +84,14 @@
    [:p
     [:button.btn.btn-primary {:type "submit"} "Submit"]]])
 
+(defn template-editor
+  [res]
+  [:div#resource-tpl
+   (:tpl res)
+   [:div
+    [:button.btn.btn-primary
+     {:on-click #(dispatch [:submit-resource-update])} "Submit"]]])
+
 (defn tab-header
   [sel id title]
   [:li
@@ -121,7 +129,7 @@
             [:h3 "Resource graph"]
             [:div.well [:h3 "TODO"]]]]
           (when tpl
-            [tab-pane sel :tpl [:div#resource-tpl tpl]])
+            [tab-pane sel :tpl [template-editor res]])
           (when related?
             [tab-pane sel :related (related-resource-table res)])]]))))
 

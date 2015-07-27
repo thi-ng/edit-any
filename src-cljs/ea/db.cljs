@@ -46,7 +46,9 @@
  :nav-change
  (fn [db [_ route]]
    (info :nav-change (dissoc route :validate :component))
-   (assoc-in db [:session :current-page] route)))
+   (-> db
+       (assoc-in [:session :current-page] route)
+       (dissoc :resource-form))))
 
 (register-handler
  :nav-trigger
@@ -88,4 +90,21 @@
  :resource-field-edit
  (fn [db [_ id v]]
    (info :edit id v)
-   (assoc-in db [:form id] v)))
+   (assoc-in db [:resource-form id] v)))
+
+(register-handler
+ :submit-resource-update
+ (fn [db _]
+   (when-let [form (:resource-form db)]
+     (utils/do-request
+      {:uri     (server-route (-> db :session :current-page))
+       :method  :post
+       :data    form
+       :success (fn [_ data] (dispatch [:resource-updated data]))}))
+   db))
+
+(register-handler
+ :resource-updated
+ (fn [db [_ res]]
+   (info :updated res)
+   db))

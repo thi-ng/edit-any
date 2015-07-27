@@ -16,5 +16,6 @@
 
 (defn is-template?
   [{:keys [attribs prefixes] :as res}]
-  (let [tpl (str (prefixes "ea") "Template")]
-    (some #(= tpl (% '?val)) (attribs (:type rdf)))))
+  (when attribs
+    (let [tpl (str (prefixes "ea") "Template")]
+      (some #(= tpl (% '?val)) (attribs (:type rdf))))))
