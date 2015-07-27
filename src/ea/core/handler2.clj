@@ -4,12 +4,13 @@
    [ea.core.model :as model]
    [ea.core.views2 :as views]
    [ea.core.instrument :as instr]
+   [ea.core.utils :as utils]
    [thi.ng.trio.vocabs.utils :as vu]
    [manifold.stream :as s]
    [manifold.deferred :as d]
    [manifold.bus :as bus]
    [aleph.http :as http]
-   [compojure.core :as compojure :refer [GET ANY]]
+   [compojure.core :as compojure :refer [GET POST]]
    [compojure.route :as route]
    [liberator.conneg :as conneg]
    [ring.util.response :as resp]
@@ -17,10 +18,9 @@
    [ring.middleware.stacktrace :refer [wrap-stacktrace]]
    [clojure.string :as str]
    [clojure.core.async :as async :refer [go go-loop <! >! close! chan timeout]]
+   [clojure.pprint :refer [pprint]]
    [com.stuartsierra.component :as comp]
    [taoensso.timbre :refer [info warn error]]))
-
-(def pprint-str #(with-out-str (clojure.pprint/pprint %)))
 
 (defn negotiate-media-type
   [req]
@@ -28,7 +28,7 @@
     (conneg/best-allowed-content-type accept ["text/html" "application/edn"])
     (str/join "/" accept)))
 
-(defn handle-resource-get-edn
+(defn get-resource-edn
   [req model accept]
   (let [id          (-> req :params :id)
         uri         (model/as-resource-uri model id)
@@ -58,21 +58,42 @@
         (resp/response)
         (resp/content-type accept))))
 
-(defn handle-resource-get
+(defn get-resource
   [req model config]
   (let [accept (negotiate-media-type req)]
     (cond
-      (= "application/edn" accept) (handle-resource-get-edn req model accept)
+      (= "application/edn" accept) (get-resource-edn req model accept)
       :else                        (views/html-template req config))))
+
+(defn update-resource
+  [req model config]
+  (let [id       (-> req :params :id)
+        params   (:form-params req)
+        [src new merged diff] (model/compute-resource-changeset model id params)]
+    (info :update id params)
+    (info "------- src")
+    (pprint src)
+    (info "------- new")
+    (pprint new)
+    (info "------- updated")
+    (pprint merged)
+    (info :diff)
+    (pprint diff)
+    (-> (resp/response "{:status \"ok\"}")
+        (resp/content-type "application/edn"))))
 
 (defn build-routes
   [config model]
   (compojure/routes
    (GET "/" [] (resp/redirect (str "/resources/Index")))
    (GET ["/resources/:id" :id #".*"] [id :as req]
-        (let [[resp time] (instr/timed-action (handle-resource-get req model config))]
+        (let [[resp time] (instr/timed-action (get-resource req model config))]
           (info :response-time time id)
           resp))
+   (POST ["/resources/:id" :id #".*"] [id :as req]
+         (let [[resp time] (instr/timed-action (update-resource req model config))]
+           (info :response-time time id)
+           resp))
    (route/resources "/")
    (route/not-found "404")))
 
@@ -84,9 +105,9 @@
           defaults (assoc-in site-defaults [:security :anti-forgery] false)
           routes   (-> routes
                        (wrap-defaults defaults))
-          routes (if (:dev config)
-                   (wrap-stacktrace routes)
-                   routes)]
+          routes   (if (:dev config)
+                     (wrap-stacktrace routes)
+                     routes)]
       (assoc _ :routes routes)))
   (stop [_]
     (info "stopping handler..."))

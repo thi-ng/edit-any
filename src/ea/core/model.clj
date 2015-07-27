@@ -1,6 +1,7 @@
 (ns ea.core.model
   (:require
    [ea.core.protocols :as proto]
+   [ea.core.utils :as utils]
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
    [thi.ng.trio.vocabs :refer [defvocab]]
@@ -10,6 +11,8 @@
    [thi.ng.trio.vocabs.dcterms :refer [dcterms]]
    [thi.ng.trio.vocabs.owl :refer [owl]]
    [thi.ng.xerror.core :as err]
+   [clj-time.core :as t]
+   [clojure.data :refer [diff]]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.core.async :as async]
@@ -113,6 +116,15 @@
 
 (defn format-pname
   [[p n]] (str p ":" n))
+
+(defn all-resource-triples
+  [model uri] (trio/select (proto/graph model) uri nil nil))
+
+(defn as-resource-triple-seq
+  [uri attribs]
+  (->> attribs
+       (map (fn [[p o]] [uri (name p) o]))
+       (trio/triple-seq)))
 
 (defn resource-uri ;; TODO old
   [prefixes id]
@@ -227,6 +239,55 @@
             (q/query)
             (assoc acc k)))
      {} qspecs)))
+
+(defn replace-triples
+  [src new]
+  (reduce
+   (fn [acc t]
+     (let [p (nth t 1)]
+       (info :triple (trio/triple t) :p p)
+       (if-let [del (->> src
+                         (filter #(and (not= t %) (= p (:p %))))
+                         (seq))]
+         (let [acc (apply disj acc del)]
+           (info :delete del)
+           (if-not (empty? (last t)) (conj acc t) acc))
+         (if-not (empty? (last t)) (conj acc t) acc))))
+   (set src) new))
+
+(defn compute-resource-changeset
+  [model id attribs]
+  (let [now      (t/now)
+        fnow     (utils/format-date now)
+        prefixes (proto/prefix-map model)
+        uri      (if-let [uri (vu/expand-pname prefixes id)]
+                   uri
+                   (if (re-find #"^(https?|ftp|mailto):" id)
+                     id
+                     (str (prefixes "this") id)))
+        attribs  (reduce-kv
+                  (fn [acc p o]
+                    (if-let [puri (vu/expand-pname prefixes p)]
+                      (if puri
+                        (assoc
+                         acc puri
+                         (map #(or (vu/expand-pname prefixes %)
+                                   (utils/line-endings %))
+                              (if (vector? o) o [o])))
+                        acc)))
+                  {} attribs)
+        src      (all-resource-triples model uri)
+        new      (as-resource-triple-seq uri attribs)
+        auto     (if (nil? (seq src))
+                   [[uri (:created dcterms) fnow]]
+                   [[uri (:modified dcterms) fnow]])
+        merged   (replace-triples src auto)
+        merged   (if true
+                   (replace-triples merged new)
+                   (->> (into merged new)
+                        (filter #(not (empty? (last %))))))
+        delta    (diff (set src) merged)]
+    [src new merged delta]))
 
 ;;;;;;;;;;;;;;;;;; ooooollllldddddd
 
