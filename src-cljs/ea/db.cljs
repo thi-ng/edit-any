@@ -6,6 +6,7 @@
    [ea.router :as router]
    [ea.session :as session]
    [ea.utils :as utils]
+   [ea.templates :as tpl]
    [thi.ng.validate.core :as v]
    [re-frame.core :refer [register-handler subscribe dispatch]]
    [clojure.string :as str]
@@ -44,11 +45,7 @@
  :nav-change
  (fn [db [_ route]]
    (info :nav-change (dissoc route :validate :component))
-   ;;(dispatch [:nav-close-all])
-   (-> db
-       (assoc-in [:session :current-page] route)
-       #_(assoc-in [:session :current-resource] nil)
-       )))
+   (assoc-in db [:session :current-page] route)))
 
 (register-handler
  :nav-trigger
@@ -62,23 +59,22 @@
  (fn [db [_ route]]
    (utils/do-request
     {:uri     (server-route route)
-     :success (fn [_ data]
-                (dispatch [:resource-loaded data]))})
-   #_(assoc-in db [:session :current-resource] nil)
+     :success (fn [_ data] (dispatch [:resource-loaded data]))})
    db))
 
 (register-handler
  :resource-loaded
- (fn [db [_ data]]
-   (info :success data)
-   (let [{:keys [body shared-pred shared-obj]} data
-         tab (if (seq body)
-               :content
-               (if (or (seq shared-pred) (seq shared-obj))
-                 :related
-                 :edit))]
+ (fn [db [_ res]]
+   (info :success res)
+   (let [{:keys [body tpl shared-pred shared-obj]} res
+         res (if tpl (tpl/build-resource-template res) res)
+         tab (cond
+               (seq body)                              :content
+               (tpl/is-template? res)                  :tpl
+               (or (seq shared-pred) (seq shared-obj)) :related
+               :else :edit)]
      (-> db
-         (assoc-in [:session :current-resource] data)
+         (assoc-in [:session :current-resource] res)
          (assoc-in [:ui :current-resource-view-tab] tab)))))
 
 (register-handler
@@ -86,3 +82,9 @@
  (fn [db [_ id]]
    (info :select-tab id)
    (assoc-in db [:ui :current-resource-view-tab] id)))
+
+(register-handler
+ :resource-field-edit
+ (fn [db [_ id v]]
+   (info :edit id v)
+   (assoc-in db [:form id] v)))

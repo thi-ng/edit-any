@@ -13,6 +13,7 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.core.async :as async]
+   [clojure.walk :refer [postwalk]]
    [com.stuartsierra.component :as comp]
    [taoensso.timbre :refer [info warn error]]))
 
@@ -113,7 +114,7 @@
 (defn format-pname
   [[p n]] (str p ":" n))
 
-(defn resource-uri
+(defn resource-uri ;; TODO old
   [prefixes id]
   (let [uri?    (re-seq #"^(https?://|mailto:|ftp://)" id)
         pn      (vu/find-prefix prefixes id)
@@ -194,6 +195,38 @@
     :from   (proto/graph model)
     :query  [{:where [['?id (:type rdf) (:AttributeCollection ea)]
                       ['?id (:description dcterms) '?tpl]]}]}))
+
+(defn resource-template
+  [model id]
+  (-> {:select :*
+       :from   (proto/graph model)
+       :query  [{:where [[id (:type rdf) '?type]
+                         ['?type (:hasTemplate ea) '?tpl-id]
+                         ['?tpl-id (:query ea) '?q]
+                         ['?tpl-id (:instanceView ea) '?tpl]]}]}
+      (q/query)
+      (first)))
+
+(defn expand-pname-in-query
+  [prefixes x]
+  (if (string? x)
+    (or (vu/expand-pname prefixes x) x)
+    x))
+
+(defn execute-resource-tpl-queries
+  [model uri {:syms [?q ?tpl] :as tpl-spec}]
+  (info :template-spec tpl-spec)
+  (let [prefixes (proto/prefix-map model)
+        graph    (proto/graph model)
+        qspecs   (read-string ?q)
+        qspecs   (postwalk #(expand-pname-in-query prefixes %) qspecs)]
+    (info :expanded qspecs)
+    (reduce-kv
+     (fn [acc k spec]
+       (->> (assoc spec :from graph :values {'?this #{uri}})
+            (q/query)
+            (assoc acc k)))
+     {} qspecs)))
 
 ;;;;;;;;;;;;;;;;;; ooooollllldddddd
 

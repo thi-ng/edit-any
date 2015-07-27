@@ -121,7 +121,7 @@
             [:h3 "Resource graph"]
             [:div.well [:h3 "TODO"]]]]
           (when tpl
-            [tab-pane sel :tpl [:div#resource-tpl (first tpl)]])
+            [tab-pane sel :tpl [:div#resource-tpl tpl]])
           (when related?
             [tab-pane sel :related (related-resource-table res)])]]))))
 
