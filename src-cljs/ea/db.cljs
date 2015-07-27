@@ -6,6 +6,7 @@
    [ea.router :as router]
    [ea.session :as session]
    [ea.utils :as utils]
+   [ea.model :as model]
    [ea.templates :as tpl]
    [thi.ng.validate.core :as v]
    [re-frame.core :refer [register-handler subscribe dispatch]]
@@ -70,7 +71,7 @@
          res (if tpl (tpl/build-resource-template res) res)
          tab (cond
                (seq body)                              :content
-               (tpl/is-template? res)                  :tpl
+               (model/is-template? res)                :tpl
                (or (seq shared-pred) (seq shared-obj)) :related
                :else :edit)]
      (-> db
