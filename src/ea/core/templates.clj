@@ -1,5 +1,6 @@
 (ns ea.core.templates
   (:require
+   [ea.core.protocols :as proto]
    [ea.core.model :as model :refer [ea]]
    [thi.ng.trio.core :as trio]
    [thi.ng.trio.query :as q]
@@ -55,3 +56,19 @@
        (q/query)
        (map #(populate-template prefixes graph id %))
        (seq)))
+
+(defn build-resource-template2
+  [model id]
+  (let [graph    (proto/graph model)
+        prefixes (proto/prefix-map model)
+        tpl      (->> {:select :*
+                       :from   graph
+                       :query  [{:where [[id (:type rdf) '?type]
+                                         ['?type (:hasTemplate ea) '?tpl-id]
+                                         ['?tpl-id (:query ea) '?q]
+                                         ['?tpl-id (:instanceView ea) '?tpl]]}]}
+                      (q/query)
+                      (mapcat #(populate-template prefixes graph id %))
+                      (seq))]
+    (info :final-tpl tpl)
+    tpl))

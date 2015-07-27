@@ -24,6 +24,7 @@
    (dispatch [:start-router])
    (assoc db
           :config config
+          :ui     {:current-resource-view-tab :content}
           :inited true)))
 
 (register-handler
@@ -70,4 +71,18 @@
  :resource-loaded
  (fn [db [_ data]]
    (info :success data)
-   (assoc-in db [:session :current-resource] data)))
+   (let [{:keys [body shared-pred shared-obj]} data
+         tab (if (seq body)
+               :content
+               (if (or (seq shared-pred) (seq shared-obj))
+                 :related
+                 :edit))]
+     (-> db
+         (assoc-in [:session :current-resource] data)
+         (assoc-in [:ui :current-resource-view-tab] tab)))))
+
+(register-handler
+ :select-resource-view-tab
+ (fn [db [_ id]]
+   (info :select-tab id)
+   (assoc-in db [:ui :current-resource-view-tab] id)))

@@ -12,9 +12,10 @@
   (info :register-sub id path)
   (register-sub id (fn [db _] (reaction (get-in @db path)))))
 
-(path-subscription :current-page     [:session :current-page])
-(path-subscription :current-resource [:session :current-resource])
-(path-subscription :current-user     [:session :user])
+(path-subscription :current-page              [:session :current-page])
+(path-subscription :current-resource          [:session :current-resource])
+(path-subscription :current-resource-view-tab [:ui :current-resource-view-tab])
+(path-subscription :current-user              [:session :user])
 
 (register-sub
  :app-ready?

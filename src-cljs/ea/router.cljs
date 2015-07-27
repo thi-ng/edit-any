@@ -90,7 +90,7 @@
                       (.-token e))
              route  (split-token token)
              route' (match-route routes route @user)]
-         (debug :route route :token token :id (:id route'))
+         ;;(debug :route route :token token :id (:id route'))
          (if route'
            (dispatch-route route')
            (do

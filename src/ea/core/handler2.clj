@@ -2,6 +2,7 @@
   (:require
    [ea.core.protocols :as proto]
    [ea.core.model :as model]
+   [ea.core.templates :as tpl]
    [ea.core.views2 :as views]
    [ea.core.instrument :as instr]
    [thi.ng.trio.vocabs.utils :as vu]
@@ -34,7 +35,7 @@
         uri         (model/as-resource-uri model id)
         res         (model/resource-title-body model uri)
         title       (model/resource-title model res uri)
-        ;;tpl         (tpl/build-resource-template prefixes graph id)
+        tpl         (tpl/build-resource-template2 model uri)
         attr-tpls   (model/all-attrib-templates model)
         attribs     (model/other-resource-attribs model uri)
         shared-pred (model/facet-shared-predicate model uri)
@@ -45,10 +46,11 @@
          :body (res '?body)
          :res-uri res-uri
          :title title
+         :tpl tpl
          :attribs  attribs
          :attr-tpl attr-tpls
-         :preds shared-pred
-         :obj   shared-obj
+         :shared-pred shared-pred
+         :shared-obj  shared-obj
          :prefixes (proto/prefix-map model)}
         (pr-str)
         (resp/response)
