@@ -29,7 +29,7 @@
     (str/join "/" accept)))
 
 (defn get-resource-edn
-  [req model accept]
+  [req model]
   (let [id          (-> req :params :id)
         uri         (model/as-resource-uri model id)
         res         (model/resource-title-body model uri)
@@ -56,31 +56,31 @@
          :prefixes    (proto/prefix-map model)}
         (pr-str)
         (resp/response)
-        (resp/content-type accept))))
+        (resp/content-type "application/edn"))))
 
 (defn get-resource
   [req model config]
   (let [accept (negotiate-media-type req)]
     (cond
-      (= "application/edn" accept) (get-resource-edn req model accept)
+      (= "application/edn" accept) (get-resource-edn req model)
       :else                        (views/html-template req config))))
 
 (defn update-resource
   [req model config]
   (let [id       (-> req :params :id)
         params   (:form-params req)
-        [src new merged diff] (model/compute-resource-changeset model id params)]
+        [src new merged [old new' :as diff]] (model/compute-resource-changeset model id params)]
     (info :update id params)
     (info "------- src")
     (pprint src)
     (info "------- new")
     (pprint new)
-    (info "------- updated")
+    (info "------- merged")
     (pprint merged)
     (info :diff)
     (pprint diff)
-    (-> (resp/response "{:status \"ok\"}")
-        (resp/content-type "application/edn"))))
+    (proto/update-graph model old new')
+    (get-resource-edn req model)))
 
 (defn build-routes
   [config model]

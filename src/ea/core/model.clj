@@ -97,16 +97,17 @@
   (update-graph [_ old new]
     (dosync
      (alter state
-            (fn [{:keys [graph] :as state}]
-              (let [graph (-> graph
-                              (trio/remove-triples old)
-                              (trio/add-triples new))
+            (fn [state]
+              (let [graph    (-> (:graph state)
+                                 (trio/remove-triples old)
+                                 (trio/add-triples new))
                     prefixes (build-prefixes graph)]
                 (assoc state
                        :prefixes prefixes
                        :graph graph)))))
     (info "updated graph, new triples: " new)
-    (async/>! write-chan (trio/select (:graph @state)))))
+    (async/go (async/>! write-chan (trio/select (:graph @state))))
+    _))
 
 (defn make-db
   [db-conf]
