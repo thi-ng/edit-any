@@ -11,9 +11,15 @@ a.delete {
 }
 
 pre {
+  font-family: "Inconsolata", monospace !important;
   background-color: #fdf6e3;
 }
 
 textarea {
-    font-family: monospace !important;
+    font-family: "Inconsolata", monospace !important;
+    resize: vertical;
+}
+
+.tab-content>.tab-pane {
+    margin-top: 1em;
 }
