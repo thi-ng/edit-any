@@ -105,6 +105,7 @@
  (fn [db _]
    (let [edits (:resource-form-edits db)
          form  (reduce-kv (fn [acc k v] (if (edits k) (assoc acc k v) acc)) {} (:resource-form db))]
+     (info :edited-fields form)
      (when (seq form)
        (utils/do-request
         {:uri     (server-route (-> db :session :current-page))
@@ -116,5 +117,5 @@
 (register-handler
  :resource-updated
  (fn [db [_ res]]
-   (info :updated res)
+   (dispatch [:resource-loaded res])
    db))
