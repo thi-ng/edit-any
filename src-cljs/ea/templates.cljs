@@ -3,6 +3,7 @@
    [cljs-log.core :refer [debug info warn]])
   (:require
    [ea.subs :as subs]
+   [ea.markdown :as md]
    [thi.ng.trio.query :as q]
    [thi.ng.trio.vocabs.utils :as vu]
    [re-frame.core :refer [subscribe dispatch dispatch-sync]]
@@ -43,8 +44,22 @@
   (update f 1 form-field-attribs-common res))
 
 (defmethod form-field :textarea
-  [f res]
+  [[_ attribs :as f] res]
+  (dispatch
+     [:set-resource-field (:name attribs) (inject-result-var (:tpl-results res) (:value attribs))])
   (update f 1 form-field-attribs-common res))
+
+(defmethod form-field :md-preview
+  [f res]
+  (let [[_ {src :of :as attribs}] f
+        kid (keyword (str "md-" src))
+        _ (subs/path-subscription kid [:resource-form src])
+        content (subscribe [kid])]
+    [(fn []
+       [:div.form-group
+        [:label "Preview"]
+        (when @content
+          [md/markdown-component @content])])]))
 
 (defn form-field-transformer
   [res]
