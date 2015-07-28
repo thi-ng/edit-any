@@ -15,7 +15,9 @@
 (def system nil)
 
 (def default-config
-  {:db      {:type :memory :path "graph.edn"}
+  {:db      {:type :memory
+             :path "graph.edn"
+             :default-path "default-graph.edn"}
    :server  {:type :aleph :port 3000}
    :handler {:dev true
              :hljs-style-uri "/js/highlight/styles/solarized_light.css"

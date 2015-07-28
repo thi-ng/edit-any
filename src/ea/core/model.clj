@@ -17,6 +17,7 @@
    [clojure.java.io :as io]
    [clojure.core.async :as async]
    [clojure.walk :refer [postwalk]]
+   [clojure.pprint :refer [pprint]]
    [com.stuartsierra.component :as comp]
    [taoensso.timbre :refer [info warn error]]))
 
@@ -44,11 +45,10 @@
        (reduce (fn [acc {:syms [?prefix ?uri]}] (assoc acc ?prefix ?uri)) {})))
 
 (defn load-default-graph
-  []
-  (let [{:keys [prefixes triples]}
-        (->> "default-graph.edn"
-             io/resource
-             vu/load-vocab-triples)]
+  [path]
+  (info "loading default graph:" path)
+  (let [{:keys [prefixes triples]} (->> io/resource vu/load-vocab-triples)]
+    (info "default graph size:" (count triples))
     {:graph (trio/as-model triples) :prefixes prefixes}))
 
 (defn make-graph-writer
@@ -59,7 +59,7 @@
         (when g
           (info "writing graph: " path "triples:" (count g))
           (try
-            (spit path g)
+            (spit path (pr-str g))
             (catch Exception e (warn e "couldn't write graph")))
           (recur))))
     ch))
@@ -72,10 +72,12 @@
       (info "starting trio memstore using: " path)
       (->> (try
              (info "attempt reading graph...")
-             (let [graph (->> path slurp edn/read-string trio/as-model)]
+             (let [graph (->> path slurp (edn/read-string {:readers *data-readers*}) trio/as-model)]
+               (info "graph size:" (trio/model-size graph))
                {:graph graph :prefixes (build-prefixes graph)})
              (catch Exception e
-               (load-default-graph)))
+               (warn e)
+               (load-default-graph (:default-path config))))
            (ref)
            (assoc _ :write-chan (make-graph-writer path) :state))))
   (stop
@@ -288,7 +290,13 @@
                    (->> (into merged new)
                         (filter #(not (empty? (last %))))))
         delta    (diff (set src) merged)]
-    [src new merged delta]))
+    ;;(info "------- src")
+    ;;(pprint src)
+    ;;(info "------- new")
+    ;;(pprint new)
+    ;;(info "------- merged")
+    ;;(pprint merged)
+    delta))
 
 ;;;;;;;;;;;;;;;;;; ooooollllldddddd
 

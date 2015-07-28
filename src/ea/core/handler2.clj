@@ -69,17 +69,11 @@
   [req model config]
   (let [id       (-> req :params :id)
         params   (:form-params req)
-        [src new merged [old new' :as diff]] (model/compute-resource-changeset model id params)]
+        [old new :as diff] (model/compute-resource-changeset model id params)]
     (info :update id params)
-    (info "------- src")
-    (pprint src)
-    (info "------- new")
-    (pprint new)
-    (info "------- merged")
-    (pprint merged)
     (info :diff)
     (pprint diff)
-    (proto/update-graph model old new')
+    (proto/update-graph model old new)
     (get-resource-edn req model)))
 
 (defn build-routes
