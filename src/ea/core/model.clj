@@ -120,6 +120,9 @@
 (defn format-pname
   [[p n]] (str p ":" n))
 
+(defn all-predicates
+  [model] (trio/predicates (proto/graph model)))
+
 (defn all-resource-triples
   [model uri] (trio/select (proto/graph model) uri nil nil))
 

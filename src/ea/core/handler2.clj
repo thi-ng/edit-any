@@ -28,6 +28,16 @@
     (conneg/best-allowed-content-type accept ["text/html" "application/edn"])
     (str/join "/" accept)))
 
+(defn get-predicates
+  [req model]
+  (let [preds    (model/all-predicates model)
+        prefixes (proto/prefix-map model)]
+    (-> {:predicates preds
+         :prefixes   prefixes}
+        (pr-str)
+        (resp/response)
+        (resp/content-type "application/edn"))))
+
 (defn get-resource-edn
   [req model]
   (let [id          (-> req :params :id)
@@ -80,6 +90,8 @@
   [config model]
   (compojure/routes
    (GET "/" [] (resp/redirect (str "/resources/Index")))
+   (GET "/predicates" [req]
+        (get-predicates req model))
    (GET ["/resources/:id" :id #".*"] [id :as req]
         (let [[resp time] (instr/timed-action (get-resource req model config))]
           (info :response-time time id)
