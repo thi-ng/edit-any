@@ -3,7 +3,7 @@
    [reagent.ratom :refer [reaction]]
    [cljs-log.core :refer [debug info warn]])
   (:require
-   [ea.router :as router]
+   [ea.utils :as utils]
    [re-frame.core :refer [subscribe dispatch]]
    [clojure.string :as str]
    [reagent.core :as reagent]))
@@ -35,7 +35,9 @@
   [href title text]
   (let [href (maybe-pname-resource-uri href)
         text (or (pname-link-title text) text)]
-    (str "<a href=\"" href "\"><span class=\"glyphicon glyphicon-new-window\"></span> " text "</a>")))
+    (if (re-find #"^(https?|mailto):" href)
+      (str "<a href=\"" href "\"><span class=\"glyphicon glyphicon-new-window\"></span> " text "</a>")
+      (str "<a href=\"" href "\" data-route=\"" href "\">" text "</a>"))))
 
 (def renderer
   (let [r (aget js/window "__EA_MD_RENDERER__")]
@@ -50,6 +52,18 @@
           (.highlightBlock js/hljs item))
         (recur (dec i))))))
 
+(defn post-process-links [html-node]
+  (let [nodes (.querySelectorAll html-node "a")]
+    (loop [i (.-length nodes)]
+      (when-not (neg? i)
+        (when-let [item (.item nodes i)]
+          (when-let [route (.getAttribute item "data-route")]
+            (info :link-route route)
+            (.addEventListener
+             item "click"
+             (utils/prevent #(dispatch [:nav-trigger (subs route 1)])))))
+        (recur (dec i))))))
+
 (defn markdown-component [content]
   [(with-meta
      (fn []
@@ -59,7 +73,8 @@
      {:component-did-mount
       (fn [this]
         (let [node (reagent/dom-node this)]
-          (highlight-code node)))})])
+          (highlight-code node)
+          (post-process-links node)))})])
 
 (defn preview [content]
   (when (not-empty content)
