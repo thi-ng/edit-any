@@ -73,16 +73,37 @@
            [:td (resource-link prefixes id title)]])
         shared-obj)]]]))
 
+(defn resource-predicate
+  [idx [id val] preds]
+  (let [k  (str "attr" idx)
+        kp (str k "-pred")
+        ko (str k "-obj")]
+    [:fieldset {:key k}
+     [:div.row
+      [:div.form-group.col-md-6
+       [:select.form-control.input-sm
+        {:name kp
+         :defaultValue id
+         :on-change #(dispatch [:resource-field-edit kp (-> % .-target .-value)])}
+        (map (fn [p] [:option {:key (str k p) :value p} p]) preds)]]
+      [:div.form-group.col-md-6
+       [:input.form-control
+        {:name ko
+         :defaultValue val
+         :on-change #(dispatch [:resource-field-edit ko (-> % .-target .-value)])}]]]]))
+
 (defn resource-editor
-  [body]
-  [:div#resource-editor
-   [:h3 "Edit resource description"]
-   [:p
-    [:textarea.form-control
-     {:name "attribs[dcterms:description]" :rows 10
-      :defaultValue (first body)}]]
-   [:p
-    [:button.btn.btn-primary {:type "submit"} "Submit"]]])
+  [res]
+  (let [preds (subscribe [:all-predicates])]
+    (dispatch [:load-predicates])
+    (fn [res]
+      (when-let [preds @preds]
+        (let [attribs (mapcat (fn [[k vals]] (map (fn [a] [k (a '?val)]) vals)) (:attribs res))
+              sorted-preds (sort (:predicates preds))]
+          [:div#resource-editor
+           [:h3 "Edit resource attributes"]
+           (map-indexed (fn [i a] (resource-predicate i a sorted-preds)) attribs)
+           [:p [:button.btn.btn-primary {:type "submit"} "Submit"]]])))))
 
 (defn template-editor
   [res]
@@ -123,7 +144,7 @@
           (when related? [tab-header sel :related "Related"])]
          [:div.tab-content
           [tab-pane sel :content [md/preview (first body)]]
-          [tab-pane sel :edit [resource-editor body]]
+          [tab-pane sel :edit [resource-editor res]]
           [tab-pane sel :viz
            [:div#resource-viz
             [:h3 "Resource graph"]

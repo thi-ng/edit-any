@@ -83,7 +83,7 @@
     (info :update id params)
     (info :diff)
     (pprint diff)
-    (proto/update-graph model old new)
+    ;;(proto/update-graph model old new)
     (get-resource-edn req model)))
 
 (defn build-routes

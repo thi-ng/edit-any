@@ -119,3 +119,17 @@
  (fn [db [_ res]]
    (dispatch [:resource-loaded res])
    db))
+
+(register-handler
+ :load-predicates
+ (fn [db [_ route]]
+   (utils/do-request
+    {:uri     "/predicates"
+     :success (fn [_ preds] (dispatch [:predicates-loaded preds]))})
+   db))
+
+(register-handler
+ :predicates-loaded
+ (fn [db [_ preds]]
+   (info :preds preds)
+   (assoc db :predicates preds)))

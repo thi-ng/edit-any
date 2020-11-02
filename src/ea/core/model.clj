@@ -261,6 +261,36 @@
          (if-not (empty? (last t)) (conj acc t) acc))))
    (set src) new))
 
+(defn replace-triples2
+  [src new]
+  (let [[del add keep] (diff (set src) new)]
+    (info :delete del)
+    (info :add add)
+    (info :keep keep)
+    add))
+
+(def link-regexp
+  (re-pattern
+   (str "\\["
+        "([A-Za-z0-9\\-_]+:[A-Za-z0-9\\-_]*)" ;; pname
+        "?\\|?((\\w|\\s)+)\\]\\(" ;; title
+        "([\\/A-Za-z0-9#%&\\:\\?_\\-]+)" ;; uri
+        "\\)")))
+
+(defn parse-links
+  [txt]
+  (->> txt
+       (re-seq link-regexp)
+       (reduce
+        (fn [acc [_ pname title _ uri]]
+          (if pname
+            (update acc pname (fnil conj [])
+                    (if (= \/ (first uri))
+                      (str "http://localhost:3000" uri)
+                      uri))
+            acc))
+        {})))
+
 (defn compute-resource-changeset
   [model id attribs]
   (let [now      (t/now)
@@ -271,25 +301,32 @@
                    (if (re-find #"^(https?|ftp|mailto):" id)
                      id
                      (str (prefixes "this") id)))
+        attribs  (merge-with
+                  #(into (if (vector? %) % [%]) %2)
+                  attribs
+                  ;;(parse-attribs bulk-attribs)
+                  (if-let [desc (and attribs (attribs "dcterms:description"))]
+                    (let [links (parse-links desc)]
+                      (info :link links)
+                      links)))
         attribs  (reduce-kv
                   (fn [acc p o]
                     (if-let [puri (vu/expand-pname prefixes p)]
-                      (if puri
-                        (assoc
-                         acc puri
-                         (map #(or (vu/expand-pname prefixes %)
-                                   (utils/line-endings %))
-                              (if (vector? o) o [o])))
-                        acc)))
+                      (assoc
+                       acc puri
+                       (map #(or (vu/expand-pname prefixes %)
+                                 (utils/line-endings %))
+                            (if (vector? o) o [o])))
+                      acc))
                   {} attribs)
         src      (all-resource-triples model uri)
         new      (as-resource-triple-seq uri attribs)
         auto     (if (nil? (seq src))
                    [[uri (:created dcterms) fnow]]
                    [[uri (:modified dcterms) fnow]])
-        merged   (replace-triples src auto)
+        merged   (replace-triples2 src auto)
         merged   (if true
-                   (replace-triples merged new)
+                   (replace-triples2 merged new)
                    (->> (into merged new)
                         (filter #(not (empty? (last %))))))
         delta    (diff (set src) merged)]

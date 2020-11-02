@@ -3,7 +3,7 @@
   :url "http://example.com/FIXME"
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/clojurescript "0.0-3308"]
+                 [org.clojure/clojurescript "1.7.122"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [com.stuartsierra/component "0.2.3"]
                  [org.clojure/tools.namespace "0.2.10"]
@@ -27,6 +27,7 @@
                  [org.clojars.toxi/markdown-clj "0.9.57" :exclusions [org.clojure/clojure]]
 
                  [reagent "0.5.0"]
+                 [cljs-log "0.2.2"]
                  [org.clojars.toxi/re-frame "0.2.0"]
                  ;;[net.coobird/thumbnailator "0.4.8"]
                  ;;[cljsjs/codemirror "5.1.0-2"]
